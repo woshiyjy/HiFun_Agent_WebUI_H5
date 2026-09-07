@@ -1,0 +1,440 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hifun.agri/schemas/cherry_tomato/output.schema.json",
+  "title": "Cherry Tomato Diagnosis — Final Output Schema",
+  "description": "樱桃番茄诊断胶囊最终输出契约。三种通道路由：standard（标准诊断任务书）、block（阻断通知+专家转介）、human_machine（人机协同诊断包）。对应宪法output_routing定义。",
+  "type": "object",
+  "required": ["output_route", "routing_reason", "payload", "delivery"],
+  "additionalProperties": false,
+  "properties": {
+    "output_route": {
+      "type": "string",
+      "enum": ["standard", "block", "human_machine"],
+      "description": "输出通道路由"
+    },
+    "routing_reason": {
+      "type": "string",
+      "description": "路由判定原因"
+    },
+    "payload": {
+      "type": "object",
+      "description": "通道产物（根据output_route选择对应结构）",
+      "oneOf": [
+        { "$ref": "#/$defs/standard_payload" },
+        { "$ref": "#/$defs/block_payload" },
+        { "$ref": "#/$defs/human_machine_payload" }
+      ]
+    },
+    "delivery": {
+      "$ref": "#/$defs/delivery_info"
+    }
+  },
+  "$defs": {
+
+    "standard_payload": {
+      "type": "object",
+      "description": "标准通道产物：Q1-Q5全部通过、无阻断、无冲突时生成诊断任务书",
+      "required": ["task_book", "prompt_text", "knowledge_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "task_book": {
+          "type": "object",
+          "description": "诊断任务书（结构化JSON）",
+          "required": ["task_book_id", "diagnostic_scope", "analysis_prompt_ref", "output_requirements"],
+          "additionalProperties": false,
+          "properties": {
+            "task_book_id": { "type": "string" },
+            "diagnostic_scope": {
+              "type": "object",
+              "required": ["primary_scale", "object_label", "growth_phase", "environment"],
+              "additionalProperties": false,
+              "properties": {
+                "primary_scale": { "type": "string", "enum": ["M1", "M2", "M3", "M4", "Me", "Ma1", "Ma2", "Ma3", "Ma4"] },
+                "object_label": { "type": "string" },
+                "primary_organ": { "type": "string" },
+                "growth_phase": { "type": "string" },
+                "environment": { "type": "string" },
+                "view_angle": { "type": "string" },
+                "light_condition": { "type": "string" }
+              }
+            },
+            "analysis_prompt_ref": {
+              "type": "string",
+              "description": "完整提示词文本引用（assembled_prompt的hash或直接内嵌）"
+            },
+            "transition_prescriptions": {
+              "type": "array",
+              "description": "已满足的跃迁处方摘要",
+              "items": {
+                "type": "object",
+                "required": ["id", "direction", "evidence_obtained"],
+                "additionalProperties": false,
+                "properties": {
+                  "id": { "type": "string" },
+                  "direction": { "type": "string", "enum": ["downward", "upward", "cross_channel"] },
+                  "evidence_obtained": { "type": "string" },
+                  "satisfied_by_image": { "type": ["string", "null"] }
+                }
+              }
+            },
+            "output_requirements": {
+              "type": "object",
+              "required": ["format", "required_sections", "diagnostic_rules"],
+              "additionalProperties": false,
+              "properties": {
+                "format": {
+                  "type": "array",
+                  "items": { "type": "string", "enum": ["json", "txt", "pdf"] }
+                },
+                "required_sections": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "如：症状描述/病因分析/严重程度/处置建议/预后评估"
+                },
+                "diagnostic_rules": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "诊断规则约束（如'治疗时机窗需标注可逆性'）"
+                }
+              }
+            }
+          }
+        },
+        "prompt_text": {
+          "type": "string",
+          "description": "完整的八区块提示词文本，直接发送给下游大模型诊断系统"
+        },
+        "prompt_segments_digest": {
+          "type": "object",
+          "description": "提示词各区块摘要（用于审计和UI展示）",
+          "additionalProperties": { "type": "string" }
+        },
+        "knowledge_refs": {
+          "type": "array",
+          "description": "触发的知识库章节列表",
+          "items": {
+            "type": "object",
+            "required": ["source", "chapter", "purpose"],
+            "additionalProperties": false,
+            "properties": {
+              "source": { "type": "string", "enum": ["正文", "预处理手册", "指南"] },
+              "chapter": { "type": "string" },
+              "title": { "type": "string" },
+              "purpose": { "type": "string" },
+              "content_summary": { "type": "string" },
+              "validated": { "type": "boolean" }
+            }
+          }
+        },
+        "downstream_target": {
+          "type": "string",
+          "default": "大模型诊断系统",
+          "description": "下游接收方"
+        }
+      }
+    },
+
+    "block_payload": {
+      "type": "object",
+      "description": "阻断通道产物：Gate1判定为M4/Ma4时生成。冻结全部诊断推理，输出阻断通知和专家转介单。",
+      "required": ["block_notice", "expert_referral", "safety_audit"],
+      "additionalProperties": false,
+      "properties": {
+        "block_notice": {
+          "type": "object",
+          "required": ["block_id", "block_type", "reason", "redirect", "user_message"],
+          "additionalProperties": false,
+          "properties": {
+            "block_id": { "type": "string" },
+            "block_type": {
+              "type": "string",
+              "enum": ["M4_BLOCK", "Ma4_BLOCK", "RULE_BLOCK"],
+              "description": "M4/Ma4 为尺度盲区阻断，RULE_BLOCK 为 Gate3 规则阻断"
+            },
+            "block_rules": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^R[1-8]$" }
+            },
+            "detected_scale": { "type": "string", "enum": ["M1", "M2", "M3", "M4", "Me", "Ma1", "Ma2", "Ma3", "Ma4"] },
+            "reason": { "type": "string" },
+            "redirect": {
+              "type": "string",
+              "description": "建议转介的专业领域"
+            },
+            "user_message": {
+              "type": "string",
+              "description": "面向用户的红色警告文本（不含任何处方/预后/损管建议）"
+            },
+            "image_hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-fA-F0-9]{64}$",
+              "description": "被阻断图像的哈希（审计追溯）"
+            }
+          }
+        },
+        "expert_referral": {
+          "type": "object",
+          "required": ["referral_id", "specialties", "recommended_actions"],
+          "additionalProperties": false,
+          "properties": {
+            "referral_id": { "type": "string" },
+            "specialties": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "建议转介的专业领域列表"
+            },
+            "recommended_actions": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "建议采取的行动（如'联系植物病理学实验室进行电镜检测'）"
+            },
+            "morphological_description": {
+              "type": ["string", "null"],
+              "description": "仅允许形态描述，禁止诊断结论和处方"
+            }
+          }
+        },
+        "safety_audit": {
+          "type": "object",
+          "required": ["event_type", "blocked_at", "gates_executed", "prescription_safety_check"],
+          "additionalProperties": false,
+          "properties": {
+            "event_type": {
+              "type": "string",
+              "enum": ["M4_BLOCK", "Ma4_BLOCK", "RULE_BLOCK"]
+            },
+            "blocked_at": { "type": "string", "format": "date-time" },
+            "gates_executed": {
+              "type": "array",
+              "items": { "type": "string", "enum": ["G1"] },
+              "description": "阻断时仅执行了G1"
+            },
+            "prescription_safety_check": {
+              "type": "object",
+              "required": ["treatment_windows_removed", "damage_control_removed", "prognosis_removed", "knowledge_maps_voided"],
+              "additionalProperties": false,
+              "properties": {
+                "treatment_windows_removed": { "type": "boolean", "description": "治疗时机窗已删除" },
+                "damage_control_removed": { "type": "boolean", "description": "损管决策已删除" },
+                "prognosis_removed": { "type": "boolean", "description": "预后评估已删除" },
+                "knowledge_maps_voided": { "type": "boolean", "description": "正文与指南章节映射已替换为'无对应章节'" }
+              }
+            }
+          }
+        },
+        "downstream_target": {
+          "type": "string",
+          "default": "专家复核队列"
+        }
+      }
+    },
+
+    "human_machine_payload": {
+      "type": "object",
+      "description": "人机协同通道产物：冲突标记=true、或任一Gate置信度<0.6、或强制跃迁未执行时生成。受限推理，输出疑似大类不生成确定性处方。",
+      "required": ["collaborative_package", "constrained_reasoning", "user_feedback_form"],
+      "additionalProperties": false,
+      "properties": {
+        "collaborative_package": {
+          "type": "object",
+          "required": ["package_id", "trigger_condition", "confidence_summary", "unresolved_items"],
+          "additionalProperties": false,
+          "properties": {
+            "package_id": { "type": "string" },
+            "trigger_condition": {
+              "type": "string",
+              "enum": [
+                "gate4_conflict",
+                "low_confidence",
+                "forced_transition_pending",
+                "management_history_missing",
+                "multiple_conditions"
+              ]
+            },
+            "confidence_summary": {
+              "type": "object",
+              "required": ["gate1_confidence", "gate4_composite_confidence"],
+              "additionalProperties": false,
+              "properties": {
+                "gate1_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+                "gate4_composite_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+                "threshold_tolerance_pct": {
+                  "type": "number",
+                  "default": 10,
+                  "description": "阈值宽容区间（±10%）"
+                }
+              }
+            },
+            "unresolved_items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["item", "type", "blocking"],
+                "additionalProperties": false,
+                "properties": {
+                  "item": { "type": "string" },
+                  "type": {
+                    "type": "string",
+                    "enum": ["conflict", "low_confidence", "missing_evidence", "missing_history", "verification_needed"]
+                  },
+                  "blocking": {
+                    "type": "boolean",
+                    "description": "是否阻塞完整诊断输出"
+                  },
+                  "resolution_hint": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "constrained_reasoning": {
+          "type": "object",
+          "description": "受限推理结果",
+          "required": ["suspected_categories", "deterministic_prescriptions_removed", "conditional_advice", "uncertainty_option"],
+          "additionalProperties": false,
+          "properties": {
+            "suspected_categories": {
+              "type": "array",
+              "description": "疑似大类（非确定性诊断）",
+              "items": {
+                "type": "object",
+                "required": ["category", "probability", "evidence"],
+                "additionalProperties": false,
+                "properties": {
+                  "category": { "type": "string", "description": "如'真菌性病害'、'生理性缺素'、'虫害'" },
+                  "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "evidence": { "type": "array", "items": { "type": "string" } },
+                  "exclusions": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "排除的子类别"
+                  }
+                }
+              }
+            },
+            "deterministic_prescriptions_removed": {
+              "type": "boolean",
+              "description": "确定性处方已删除，替换为条件性建议"
+            },
+            "conditional_advice": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["condition", "advice"],
+                "additionalProperties": false,
+                "properties": {
+                  "condition": { "type": "string" },
+                  "advice": { "type": "string" },
+                  "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+                }
+              }
+            },
+            "uncertainty_option": {
+              "type": "object",
+              "description": "'无法确定'选项",
+              "required": ["enabled", "threshold_probability"],
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "threshold_probability": {
+                  "type": "number",
+                  "default": 0.05,
+                  "description": "概率>5%时显示'无法确定'选项"
+                },
+                "label": { "type": "string", "default": "无法确定" }
+              }
+            },
+            "morphological_description": {
+              "type": "string",
+              "description": "形态描述（不受限部分）"
+            }
+          }
+        },
+        "user_feedback_form": {
+          "type": "object",
+          "description": "用户反馈/补充表单",
+          "required": ["form_id", "fields"],
+          "additionalProperties": false,
+          "properties": {
+            "form_id": { "type": "string" },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["field_id", "label", "type", "required"],
+                "additionalProperties": false,
+                "properties": {
+                  "field_id": {
+                    "type": "string",
+                    "enum": ["fertilization", "irrigation", "pesticide", "variety", "planting_date", "previous_crop", "reshoot_image", "additional_notes"]
+                  },
+                  "label": { "type": "string" },
+                  "type": {
+                    "type": "string",
+                    "enum": ["text", "date", "select", "image_upload"]
+                  },
+                  "required": { "type": "boolean" },
+                  "placeholder": { "type": "string" },
+                  "options": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            },
+            "reshoot_prescription": {
+              "type": ["object", "null"],
+              "description": "补拍处方（如需要补图）",
+              "additionalProperties": false,
+              "properties": {
+                "target_scale": { "type": "string" },
+                "technical_params": { "type": "string" },
+                "expected_evidence": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "partial_prompt": {
+          "type": ["string", "null"],
+          "description": "受限提示词（删除确定性处方，保留疑似大类+跃迁需求）"
+        },
+        "downstream_target": {
+          "type": "string",
+          "default": "人机协同等待区（受限推理）"
+        }
+      }
+    },
+
+    "delivery_info": {
+      "type": "object",
+      "description": "交付信息",
+      "required": ["formats", "generated_at", "expires_at"],
+      "additionalProperties": false,
+      "properties": {
+        "formats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["format", "uri"],
+            "additionalProperties": false,
+            "properties": {
+              "format": { "type": "string", "enum": ["json", "txt", "pdf"] },
+              "uri": { "type": "string", "description": "产物存储URI" },
+              "byte_size": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "expires_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "产物过期时间（如有）"
+        },
+        "notification_channels": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["api_response", "email", "sms", "push", "webhook"] }
+        }
+      }
+    }
+  }
+}

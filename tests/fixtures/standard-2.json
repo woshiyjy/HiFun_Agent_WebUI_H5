@@ -1,0 +1,46 @@
+{
+  "output_route": "standard",
+  "final_output": {
+    "output_route": "standard",
+    "routing_reason": "Synthetic contract fixture",
+    "payload": {
+      "task_book": {
+        "task_book_id": "synthetic-2",
+        "diagnostic_scope": {
+          "primary_scale": "Me",
+          "object_label": "测试对象",
+          "primary_organ": "果实",
+          "growth_phase": "测试阶段",
+          "environment": "测试环境"
+        },
+        "analysis_prompt_ref": "synthetic",
+        "output_requirements": {
+          "format": [
+            "json"
+          ],
+          "required_sections": [
+            "测试说明"
+          ],
+          "diagnostic_rules": [
+            "仅用于契约测试"
+          ]
+        },
+        "transition_prescriptions": [
+          {
+            "id": "test",
+            "direction": "upward",
+            "evidence_obtained": "合成证据",
+            "satisfied_by_image": null
+          }
+        ]
+      },
+      "prompt_text": "SYNTHETIC_TEST_PLACEHOLDER",
+      "knowledge_refs": []
+    },
+    "delivery": {
+      "formats": [],
+      "generated_at": "2026-01-01T00:00:00Z",
+      "expires_at": null
+    }
+  }
+}

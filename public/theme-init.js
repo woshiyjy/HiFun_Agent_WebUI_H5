@@ -1,0 +1,1 @@
+try{const t=localStorage.getItem('hifun-theme');document.documentElement.dataset.theme=(t==='dark'||(!['light','dark'].includes(t)&&matchMedia('(prefers-color-scheme: dark)').matches))?'dark':'light'}catch{}
