@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useConversationScroll } from './useConversationScroll.js';
 import './style.css';
 import './theme.css';
 
@@ -35,7 +36,10 @@ function App() {
   const [text, setText] = useState(''), [file, setFile] = useState(null), [preview, setPreview] = useState('');
   const [busy, setBusy] = useState(false), [phase, setPhase] = useState(''), [error, setError] = useState('');
   const [pending, setPending] = useState(null), [storageError, setStorageError] = useState(false);
-  const bottom = useRef(), input = useRef(), sessionRef = useRef(null), busyRef = useRef(false);
+  const input = useRef(), sessionRef = useRef(null), busyRef = useRef(false);
+  const [processSteps, setProcessSteps] = useState([]);
+  const { viewport, content, paused, resume } = useConversationScroll([messages, phase, busy, error, preview]);
+  function status(value) { setPhase(value); setProcessSteps(steps => steps.at(-1) === value ? steps : [...steps, value].slice(-12)); }
   function save(s, list, request = null) {
     try {
       const value = JSON.stringify({ sid: s.sid, expiresAt: s.expiresAt, messages: list, pending: request });
@@ -84,7 +88,6 @@ function App() {
     window.addEventListener('storage', sync); window.addEventListener('focus', focus);
     return () => { clearInterval(timer); window.removeEventListener('storage', sync); window.removeEventListener('focus', focus); };
   }, []);
-  useEffect(() => { bottom.current?.scrollIntoView({ behavior: busy ? 'instant' : 'smooth', block: 'end' }); }, [messages, phase]);
   useEffect(() => { if (!file) { setPreview(''); return; } const url = URL.createObjectURL(file); setPreview(url); return () => URL.revokeObjectURL(url); }, [file]);
   function selectFile(event) {
     const chosen = event.target.files?.[0]; event.target.value = '';
@@ -104,7 +107,7 @@ function App() {
       }
       const list = messages.filter(m => m.id !== `${pending}-reply`);
       if (r.state === 'done') list.push({ id: `${pending}-reply`, role: 'assistant', text: r.text, route: r.route });
-      else setError(r.message || '这次处理未完成，你可以重新提问。');
+      else { if (r.text) list.push({id:`${pending}-reply`,role:'assistant',text:r.text,incomplete:true}); setError(r.message || '这次处理未完成，你可以重新提问。'); }
       setMessages(list); setPending(null); save(sessionRef.current, list);
     } catch (e) {
       setError(e.message);
@@ -114,21 +117,21 @@ function App() {
   }
   async function send(event) {
     event.preventDefault(); if (busy || pending || (!text.trim() && !file) || !session) return;
-    setBusy(true); busyRef.current = true; setError('');
+    setBusy(true); busyRef.current = true; setError(''); setProcessSteps([]); resume();
     const question = text.trim(); let next = messages; let current = sessionRef.current; let submitted = false;
     const id = crypto.randomUUID();
     try {
       let imageId;
       if (file) {
-        setPhase('正在检查图片'); const form = new FormData(); form.append('image', file);
+        status('正在检查图片'); const form = new FormData(); form.append('image', file);
         const result = await (await api('/api/image', { method: 'POST', body: form })).json();
         imageId = result.imageId; current = { ...current, expiresAt: result.expiresAt };
       }
       const user = { id, role: 'user', text: question, imageId };
-      next = [...messages, user]; setMessages(next); setText(''); setFile(null); setPhase('正在准备回答');
+      next = [...messages, user]; setMessages(next); setText(''); setFile(null); status('正在准备回答');
       sessionRef.current = current; setSession(current); setPending(id); save(current, next, id);
       submitted = true;
-      const response = await api('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId: id, text: question, imageId, history: messages.filter(m => m.text || m.imageId).slice(-30).map(({ role, text, imageId }) => ({ role, text, imageId })) }) });
+      const response = await api('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId: id, text: question, imageId, history: messages.filter(m => !m.incomplete && (m.text || m.imageId)).slice(-30).map(({ role, text, imageId }) => ({ role, text, imageId })) }) });
       const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = '', answer = '', finished = false;
       while (true) {
         const chunk = await reader.read(); buffer += decoder.decode(chunk.value, { stream: !chunk.done });
@@ -137,22 +140,23 @@ function App() {
           if (!frame.startsWith('data: ')) continue;
           const data = JSON.parse(frame.slice(6));
           if (data.expiresAt) { current = { ...current, expiresAt: data.expiresAt }; sessionRef.current = current; setSession(current); }
-          if (data.type === 'status') setPhase(data.text);
+          if (data.type === 'status') status(data.text);
           if (data.type === 'delta') {
-            answer += data.text; next = [...next.filter(m => m.id !== `${id}-reply`), { id: `${id}-reply`, role: 'assistant', text: answer }];
-            setMessages(next); save(current, next, id);
+            answer += data.text; next = [...next.filter(m => m.id !== `${id}-reply`), { id: `${id}-reply`, role: 'assistant', text: answer, incomplete: true }];
+            setMessages(next);
           }
           if (data.type === 'done') {
-            finished = true; next = next.map(m => m.id === `${id}-reply` ? { ...m, route: data.route } : m);
+            finished = true; next = next.map(m => m.id === `${id}-reply` ? { ...m, route: data.route, incomplete: false } : m);
             setMessages(next); setPending(null); save(current, next);
           }
           if (data.type === 'error') { finished = true; setPending(null); save(current, next); setError(data.message); }
         }
         if (chunk.done) break;
       }
-      if (!finished) setError('连接中断。可以恢复这次回答，系统不会自动重复提交。');
+      if (!finished) { save(current, next, id); setError('连接中断，已显示内容尚未完整。可以恢复这次回答，系统不会自动重复提交。'); }
     } catch (e) {
       setError(e.message);
+      if (submitted && !e.code) save(current, next, id);
       if (e.code === 'SESSION_EXPIRED') { await restore(); setText(question); }
       else if (e.code && !['REQUEST_PENDING', 'REQUEST_CONFLICT'].includes(e.code)) { setPending(null); save(current, next); }
       else if (!submitted) { setPending(null); }
@@ -162,12 +166,13 @@ function App() {
     <header className="header"><a className="brand" href="/" aria-label="嗨番小智首页"><img className="brand-mascot" src="/xiaozhi-user.png" alt=""/><span>嗨番小智<small>嗨番集团 · 口感番茄产业助手</small></span></a><div className="header-tools"><a href="https://docs.wehifun.cn/" target="_blank" rel="noopener noreferrer" className="knowledge-link">知识库 ↗</a><button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={dark ? '切换到亮色模式' : '切换到深色模式'} title={dark ? '切换到亮色模式' : '切换到深色模式'}>{dark ? '☀' : '☾'}</button></div></header>
     <main className="main">
       {session?.mode === 'demo' && <div className="demo-banner"><span>本地演示</span>当前用于体验对话和补图流程，尚未接入真实病害诊断。</div>}
-      <div className="conversation">
-        {messages.length === 0 ? <section className="welcome"><img className="welcome-mascot" src="/xiaozhi-user.png" alt="挥手打招呼的嗨番小智"/><span className="eyebrow">你好，我是嗨番小智</span><h1>关于口感番茄，<br/>我们一起聊聊。</h1><p>可以问种植与产业知识，也可以上传图片，<br className="desktop-break"/>一起梳理问题、补充情况，继续追问。</p><div className="suggestions">{['你能帮我做什么？', '我想诊断番茄图片，需要怎么拍、补充哪些情况？', '帮我查查釜山88的品种特点和种植注意事项。'].map(q => <button type="button" key={q} onClick={() => { setText(q); document.getElementById('question')?.focus(); }}>{q}<span>↗</span></button>)}</div><p className="company-intro">嗨番集团是一家专注于口感番茄的产业运营商。</p></section> : <section className="message-list" aria-label="与嗨番小智对话">{messages.map(m => <article className={`message ${m.role}`} key={m.id}><div className="message-label">{m.role === 'user' ? '你' : '嗨番小智'}{m.route && <span className="route-tag">{{ standard: '分析参考', human_machine: '需要补充', block: '暂无法判断' }[m.route]}</span>}</div>{m.imageId && <img className="message-image" src={`/api/images/${m.imageId}`} alt="本次上传的番茄图片" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.hidden = false; }}/ >}{m.imageId && <p hidden className="expired-image">图片已不可用，需要重新查看时请补传。</p>}{m.text && <div className="message-text">{m.role === 'assistant' ? <Markdown remarkPlugins={[remarkGfm]} components={{ a: SourceLink, img: () => null }}>{m.text}</Markdown> : m.text}</div>}</article>)}</section>}
-        {busy && <div className="progress" role="status"><span className="pulse"/>{phase || '正在回答'}</div>}
-        <div ref={bottom}/>
+      <div className="conversation" ref={viewport} tabIndex={0} aria-label="对话内容"><div ref={content}>
+        {messages.length === 0 ? <section className="welcome"><img className="welcome-mascot" src="/xiaozhi-user.png" alt="挥手打招呼的嗨番小智"/><span className="eyebrow">你好，我是嗨番小智</span><h1>关于口感番茄，<br/>我们一起聊聊。</h1><p>可以问种植与产业知识，也可以上传图片，<br className="desktop-break"/>一起梳理问题、补充情况，继续追问。</p><div className="suggestions">{['你能帮我做什么？', '我想诊断番茄图片，需要怎么拍、补充哪些情况？', '帮我查查高俪红的品种特点和种植注意事项。'].map(q => <button type="button" key={q} onClick={() => { setText(q); document.getElementById('question')?.focus(); }}>{q}<span>↗</span></button>)}</div><p className="company-intro">嗨番集团是一家专注于口感番茄的产业运营商。</p></section> : <section className="message-list" aria-label="与嗨番小智对话">{messages.map(m => <article className={`message ${m.role}`} key={m.id}><div className="message-label">{m.role === 'user' ? '你' : '嗨番小智'}{m.incomplete && <span className="reply-state">{busy && m.id === `${pending}-reply` ? '生成中' : '回答未完整'}</span>}{m.route && <span className="route-tag">{{ standard: '分析参考', human_machine: '需要补充', block: '暂无法判断' }[m.route]}</span>}</div>{m.imageId && <img className="message-image" src={`/api/images/${m.imageId}`} alt="本次上传的番茄图片" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.hidden = false; }}/ >}{m.imageId && <p hidden className="expired-image">图片已不可用，需要重新查看时请补传。</p>}{m.text && <div className="message-text">{m.role === 'assistant' ? <Markdown remarkPlugins={[remarkGfm]} components={{ a: SourceLink, img: () => null }}>{m.text}</Markdown> : m.text}</div>}</article>)}</section>}
+        {busy && <details className="process"><summary><span className="pulse"/><span role="status">{phase || '正在回答'}</span></summary><ol>{processSteps.map((step,i) => <li key={i}>{step}</li>)}</ol></details>}
+        </div>
       </div>
       <div className="composer-area">
+        {paused && <button type="button" className="latest" onClick={resume}>{busy ? '正在回答 · 回到最新 ↓' : '回到最新 ↓'}</button>}
         {error && <div className="error" role="alert">{error}</div>}
         {storageError && <div className="error" role="alert">浏览器未能保存对话。刷新或关闭后可能无法恢复。</div>}
         {pending && !busy && <button className="recover" onClick={recover}>恢复上一条回答</button>}

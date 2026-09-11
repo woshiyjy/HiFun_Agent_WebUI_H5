@@ -10,3 +10,20 @@ body{background:var(--bg);color:var(--text)}.header,.composer,.recover{backgroun
 @media(max-width:360px){.brand small{max-width:140px}.knowledge-link{display:none}.file-hint{max-width:90px}.composer-tools{gap:5px}}
 
 .brand-mascot{border-radius:14px}.welcome-mascot{border-radius:28px}
+
+/* Keep the composer outside the scroll viewport; new content never hides beneath it. */
+.app-shell{height:var(--app-height,100dvh);min-height:0;overflow:hidden}
+.header,footer{flex-shrink:0}
+.main{min-height:0;margin:0 auto;padding-top:12px;overflow:hidden}
+.conversation{min-height:0;overflow-y:auto;overscroll-behavior-y:contain;overflow-anchor:none;scroll-behavior:auto;padding-top:24px;padding-bottom:12px}
+.composer-area{position:relative;flex-shrink:0}
+.demo-banner{flex-shrink:0}
+.latest{display:block;margin:0 auto 8px;border:1px solid var(--border);border-radius:18px;padding:5px 14px;color:var(--text);background:var(--surface);font-size:13px}
+.process{font-size:13px;color:var(--muted);margin:12px 8px}
+.process summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.process summary::-webkit-details-marker{display:none}
+.process summary::after{content:'展开';margin-left:auto;font-size:12px}
+.process[open] summary::after{content:'收起'}
+.process ol{padding-left:24px;margin:8px 0}
+.reply-state{font-weight:400;color:var(--muted);font-size:12px}
+@media(max-width:700px){.header{height:66px}.main{padding-top:8px}.conversation{padding-top:12px}.composer-area{padding-bottom:max(8px,env(safe-area-inset-bottom))}.privacy{margin-top:6px}footer{display:none}}

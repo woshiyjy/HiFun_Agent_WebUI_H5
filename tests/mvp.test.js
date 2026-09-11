@@ -105,7 +105,7 @@ test('Pi 真实 Runtime 执行演示 Tool，并输出明确演示标记', async 
   const responder = createResponder({ diagnose: async () => { calls++; return { output_route: 'human_machine', payload: { demo: true } }; } });
   const result = await responder({ text: '叶子怎么了', image: { id: randomUUID(), buffer: await picture() }, history: [], emit: e => events.push(e) });
   assert.equal(calls, 1); assert.equal(result.route, 'human_machine');
-  assert.ok(events.some(e => e.type === 'status' && e.text.includes('整理')));
+  assert.ok(events.some(e => e.type === 'status' && e.text.includes('分析图片')));
   assert.match(events.filter(e => e.type === 'delta').map(e => e.text).join(''), /没有对这张图片做病害识别/);
 });
 
@@ -191,4 +191,14 @@ test('同一图片诊断跨请求和重启复用，未完成执行不重跑', as
  await assert.rejects(f.store.diagnoseOnce(sid, bad.id, async () => { throw new Error('network'); }), /network/);
  await assert.rejects(f.store.diagnoseOnce(sid, bad.id, execute), /不会自动重复/);
  assert.equal(calls, 1);
+});
+
+test('流式失败保留未完成片段，恢复不标记成功或重复执行',async t=>{
+  let calls=0;
+  const f=await fixture(t,async({emit})=>{calls++;emit({type:'delta',text:'未完成片段'});throw new Error('generation interrupted')});
+  const session=await f.session();const requestId=randomUUID();
+  const r=await f.request('/api/chat',{method:'POST',headers:{Cookie:session.cookie,'Content-Type':'application/json'},body:{requestId,text:'问题'}});
+  const body=await r.text();assert.match(body,/未完成片段/);assert.match(body,/"type":"error"/);assert.doesNotMatch(body,/"type":"done"/);
+  const saved=await (await f.request(`/api/requests/${requestId}`,{headers:{Cookie:session.cookie}})).json();
+  assert.equal(saved.state,'failed');assert.equal(saved.text,'未完成片段');assert.equal(calls,1);
 });

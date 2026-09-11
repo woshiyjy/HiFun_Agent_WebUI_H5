@@ -3,14 +3,16 @@ import assert from 'node:assert/strict';
 import { AssistantMessageEventStream } from '@earendil-works/pi-ai';
 import { createResponder } from '../server/responder.js';
 export function scripted(steps, inspect = () => {}) {
- let index = 0;
+ let index = 0, finalText = '完成';
  return (model, context) => {
-  inspect(context, index);
-  let item = steps[index++] || { text: '完成' };
+  const final = context.tools?.length === 0;
+  if (!final) inspect(context, index);
+  let item = final ? {text:finalText, raw:true} : steps[index++] || { text: '完成' };
   if (item.text && !item.raw) item = {tools:[{name:'complete_answer',args:{kind:item.kind || 'clarification',answer:item.text,sourceIds:item.sourceIds || []}}]};
+  if (!final) for (const tool of item.tools || []) if (tool.name === 'complete_answer') { finalText = tool.args.answer || finalText; delete tool.args.answer; }
   const stream = new AssistantMessageEventStream();
   const message = { role: 'assistant', api: model.api, provider: model.provider, model: model.id, timestamp: Date.now(), usage: { input:0,output:0,cacheRead:0,cacheWrite:0,totalTokens:0,cost:{input:0,output:0,cacheRead:0,cacheWrite:0,total:0} }, content: item.tools ? item.tools.map((x,i)=>({type:'toolCall',id:`call-${index}-${i}`,name:x.name,arguments:x.args})) : [{type:'text',text:item.text}], stopReason:item.tools?'toolUse':'stop' };
-  queueMicrotask(()=>{stream.push({type:'done',reason:message.stopReason,message});stream.end(message)});
+  queueMicrotask(()=>{if(final) stream.push({type:'text_delta',delta:item.text,partial:message,contentIndex:0});stream.push({type:'done',reason:message.stopReason,message});stream.end(message)});
   return stream;
  };
 }

@@ -106,7 +106,7 @@ export function createApp({ store, responder, mode = 'demo', origin = 'http://12
       emit({ type: 'done', requestId, route: result?.route, expiresAt: s.exp });
     } catch (error) {
       const message = error instanceof AppError ? error.message : '本次处理未完成，请稍后再试。';
-      await store.putRequest({ ...receipt, state: error.code === 'DIAGNOSIS_UNKNOWN' ? 'unknown' : 'failed', message });
+      await store.putRequest({ ...receipt, state: error.code === 'DIAGNOSIS_UNKNOWN' ? 'unknown' : 'failed', message, text: answer });
       emit({ type: 'error', code: error.code || 'PROCESSING', message });
     } finally { clearInterval(heartbeat); active.delete(requestId); busy.delete(s.sid); res.end(); }
   });
