@@ -19,7 +19,7 @@ if (!['127.0.0.1', 'localhost'].includes(host)) throw new Error('This local MVP 
 const port = Number(process.env.PORT || 1842);
 const production = process.env.NODE_ENV === 'production';
 if (production && process.env.PUBLIC_ORIGIN !== 'https://www.wehifun.cn') throw new Error('Production requires the approved HTTPS origin.');
-const store = await createStore(path.join(root, '.runtime'));
+const store = await createStore(path.join(root, '.runtime'), { tokenLimit: Number(process.env.SESSION_TOKEN_LIMIT || 10000000) });
 const diagnose = createDiagnosis({ mode, env: config, journalDir: path.join(root, '.runtime/cloud') });
 const app = createApp({ store, responder: createResponder({ mode, diagnose, env: config }), mode, origin: production ? process.env.PUBLIC_ORIGIN : `http://${host}:${port}`, production });
 let vite;

@@ -2,6 +2,7 @@ import { randomBytes, randomUUID, createHmac, timingSafeEqual } from 'node:crypt
 import { mkdir, readFile, writeFile, readdir, unlink, rename, link } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
+import { DEFAULT_TOKEN_LIMIT, quotaError } from './quota.js';
 
 export const SESSION_TTL = 2 * 60 * 60 * 1000;
 export const IMAGE_TTL = 24 * 60 * 60 * 1000;
@@ -10,9 +11,10 @@ export class AppError extends Error {
 }
 export const validId = value => typeof value === 'string' && /^[a-f0-9-]{36}$/.test(value);
 
-export async function createStore(root, { now = Date.now, sessionTtl = SESSION_TTL, imageTtl = IMAGE_TTL } = {}) {
+export async function createStore(root, { now = Date.now, sessionTtl = SESSION_TTL, imageTtl = IMAGE_TTL, tokenLimit = DEFAULT_TOKEN_LIMIT } = {}) {
+  if (!Number.isSafeInteger(tokenLimit) || tokenLimit <= 0) throw new Error('Invalid SESSION_TOKEN_LIMIT');
   await mkdir(root, { recursive: true, mode: 0o700 });
-  for (const dir of ['images', 'requests', 'diagnoses']) await mkdir(path.join(root, dir), { recursive: true, mode: 0o700 });
+  for (const dir of ['images', 'requests', 'diagnoses', 'usage']) await mkdir(path.join(root, dir), { recursive: true, mode: 0o700 });
   const secretFile = path.join(root, 'session-key');
   let secret;
   try { secret = await readFile(secretFile); }
@@ -107,8 +109,43 @@ export async function createStore(root, { now = Date.now, sessionTtl = SESSION_T
     try { if (exclusive) await link(temporary, destination); else await rename(temporary, destination); }
     finally { await unlink(temporary).catch(() => {}); }
   }
+  // One application process owns runtime; serialize ledger mutations per session.
+  const usageLocks = new Map();
+  function quota(sid) {
+    const mutate = action => {
+      const previous = usageLocks.get(sid) || Promise.resolve();
+      const next = previous.catch(() => {}).then(async () => {
+        const record = await read('usage', sid) || { id: sid, used: 0, pending: {} };
+        const result = action(record);
+        record.expiresAt = now() + Math.max(imageTtl, sessionTtl) + 10 * 60 * 1000;
+        const dest = file('usage', sid), temp = `${dest}.${randomUUID()}.tmp`;
+        await writeFile(temp, JSON.stringify(record), { mode: 0o600 });
+        await rename(temp, dest);
+        return result;
+      });
+      usageLocks.set(sid, next);
+      next.finally(() => { if (usageLocks.get(sid) === next) usageLocks.delete(sid); }).catch(() => {});
+      return next;
+    };
+    return {
+      reserve: (id, amount) => mutate(r => {
+        if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Invalid reservation');
+        if (r.pending[id] !== undefined) throw new Error('Duplicate reservation');
+        if (r.used + Object.values(r.pending).reduce((a,b) => a+b, 0) + amount > tokenLimit) throw quotaError();
+        r.pending[id] = amount;
+      }),
+      settle: (id, actual) => mutate(r => {
+        if (r.pending[id] === undefined) return;
+        if (actual === null) return; // Unknown usage remains reserved across restart.
+        if (!Number.isSafeInteger(actual) || actual < 0) throw new Error('Invalid usage');
+        r.used += actual;
+        delete r.pending[id];
+      }),
+      snapshot: () => mutate(r => ({ limit: tokenLimit, used: r.used, reserved: Object.values(r.pending).reduce((a,b) => a+b, 0) })),
+    };
+  }
   async function sweep() {
-    for (const dir of ['images', 'requests', 'diagnoses']) {
+    for (const dir of ['images', 'requests', 'diagnoses', 'usage']) {
       for (const name of await readdir(path.join(root, dir))) {
         if (!name.endsWith('.json')) continue;
         let record;
@@ -121,5 +158,5 @@ export async function createStore(root, { now = Date.now, sessionTtl = SESSION_T
     }
   }
   await sweep();
-  return { now, sessionTtl, imageTtl, sign, session, createSession, renew, saveImage, getImage, getEvidence, setEvidence, getRequest, putRequest, diagnoseOnce, sweep };
+  return { now, sessionTtl, imageTtl, sign, session, createSession, renew, saveImage, getImage, getEvidence, setEvidence, getRequest, putRequest, diagnoseOnce, quota, sweep };
 }

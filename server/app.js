@@ -46,6 +46,7 @@ export function createApp({ store, responder, mode = 'demo', origin = 'http://12
   });
   app.post('/api/image', requireSession, upload.single('image'), async (req, res) => {
     if (!req.file) throw new AppError('IMAGE_REQUIRED', '请选择一张图片。');
+    await store.quota(req.session.sid).snapshot(); // Keep usage through image-only activity too.
     const image = await store.saveImage(req.session.sid, req.file.buffer);
     const s = store.renew(req.session); cookie(res, s);
     res.json({ imageId: image.id, expiresAt: s.exp, imageExpiresAt: image.expiresAt });
@@ -98,7 +99,7 @@ export function createApp({ store, responder, mode = 'demo', origin = 'http://12
     const heartbeat = setInterval(() => { if (!res.destroyed) res.write(': heartbeat\n\n'); }, 15000);
     let answer = '';
     try {
-      const result = await responder({ text, image, referenceImage, trustedHistory, history: history.slice(-30), sid: s.sid, requestId, runDiagnosis: (selected, execute) => store.diagnoseOnce(s.sid, selected.id, execute), emit: data => {
+      const result = await responder({ text, image, referenceImage, trustedHistory, history: history.slice(-30), sid: s.sid, requestId, quota: store.quota(s.sid), runDiagnosis: (selected, execute) => store.diagnoseOnce(s.sid, selected.id, execute), emit: data => {
         if (data.type === 'delta') answer += data.text;
         emit(data);
       } });

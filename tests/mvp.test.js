@@ -11,10 +11,10 @@ import { createDiagnosis, validateEnvelope, assertChengbiao } from '../server/di
 import { createResponder, conversationEvidence } from '../server/responder.js';
 
 const picture = () => sharp({ create: { width: 32, height: 40, channels: 3, background: '#c34834' } }).png().toBuffer();
-async function fixture(t, responder) {
+async function fixture(t, responder, storeOptions = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'tomato-h5-test-'));
   let time = Date.now();
-  const store = await createStore(root, { now: () => time });
+  const store = await createStore(root, { ...storeOptions, now: () => time });
   const app = createApp({ store, responder: responder || createResponder({ diagnose: createDiagnosis() }) });
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
@@ -201,4 +201,33 @@ test('流式失败保留未完成片段，恢复不标记成功或重复执行',
   const body=await r.text();assert.match(body,/未完成片段/);assert.match(body,/"type":"error"/);assert.doesNotMatch(body,/"type":"done"/);
   const saved=await (await f.request(`/api/requests/${requestId}`,{headers:{Cookie:session.cookie}})).json();
   assert.equal(saved.state,'failed');assert.equal(saved.text,'未完成片段');assert.equal(calls,1);
+});
+
+
+test('HTTP额度耗尽提示、请求重放不重复计费、恢复不重置及过期重置',async t=>{
+ let executions=0;
+ const f=await fixture(t,async({quota,emit})=>{
+   await quota.reserve('call',60);executions++;await quota.settle('call',50);
+   emit({type:'delta',text:'完成'});return {};
+ },{tokenLimit:100});
+ const s=await f.session(),id=randomUUID();
+ const request=async(requestId,cookie=s.cookie)=>await (await f.request('/api/chat',{method:'POST',cookie,body:{requestId,text:'你好'}})).text();
+ assert.match(await request(id),/"type":"done"/);
+ assert.match(await request(id),/"type":"done"/);assert.equal(executions,1);
+ const restored=await (await f.request('/api/session',{method:'POST',cookie:s.cookie})).json();assert.equal(restored.sid,s.sid);
+ assert.match(await request(randomUUID()),/SESSION_QUOTA/);assert.equal(executions,1);
+ f.advance(SESSION_TTL+1);
+ const fresh=await f.session();assert.match(await request(randomUUID(),fresh.cookie),/"type":"done"/);assert.equal(executions,2);
+});
+
+test('持续上传图片维持会话时，旧主模型用量不会提前清理',async t=>{
+ const f=await fixture(t,undefined,{imageTtl:1000,sessionTtl:SESSION_TTL});const s=await f.session();
+ await f.store.quota(s.sid).reserve('used',100);await f.store.quota(s.sid).settle('used',90);
+ let cookie=s.cookie;
+ for(let i=0;i<3;i++){
+   f.advance(60*60000);const body=new FormData();body.append('image',new Blob([await picture()],{type:'image/png'}),'test.png');
+   const r=await f.request('/api/image',{method:'POST',cookie,body});assert.equal(r.status,200);cookie=r.headers.get('set-cookie').split(';')[0];
+   await f.store.sweep();
+ }
+ assert.equal(f.store.session(cookie.slice(15)).sid,s.sid);assert.equal((await f.store.quota(s.sid).snapshot()).used,90);
 });
