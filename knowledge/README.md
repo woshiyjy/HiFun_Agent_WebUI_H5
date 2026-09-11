@@ -2,8 +2,8 @@
 
 - 来源：https://github.com/woshiyjy/OSS_Docs
 - 原文站：https://docs.wehifun.cn/
-- 本次同步 commit：067b33326c3da90123b86beec613f5a55fcacde9
-- 同步日期：2026-09-07；仅复制 docs 下 Markdown，不执行上游代码或工作流。
+- 本次同步 commit：c80f9f129478fd9c9c7bbab13357944b7f585d02
+- 同步日期：2026-09-11；仅复制 docs 下 Markdown，不执行上游代码或工作流。
 - 79 个概念条目，66 篇正文、13 篇占位；另有目录与日志。
 - 上游 README 声明 OKF v0.1。当前官方规范为 v0.2：https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md 。本地读取基础 type/title/description/tags/timestamp，不声称已完成新版信任字段迁移或独立合规认证。
 
@@ -11,8 +11,12 @@ source 是上游只读副本，不人工编辑正文。当前采用内存中文�
 
 更新：将上游仓库检出到独立临时目录，审查 docs 差异，运行 `node scripts/sync-knowledge.mjs /绝对路径/OSS_Docs`；然后运行测试并重启本地服务。脚本只复制 Markdown，不连接服务器、不推送 GitHub、不执行上游构建。当前没有自动同步任务。
 
-## 发布前检查（2026-09-07）
+## 历史发布前检查（2026-09-07）
 
-已检查上游 `6d922f4da2ad10e2f8bb9b0d228195d480034773`，与当前 `067b33326c3da90123b86beec613f5a55fcacde9` 的 docs 无差异，保留现有快照和同步时间，不生成重复快照。
+当时检查上游 `6d922f4da2ad10e2f8bb9b0d228195d480034773`，与当时的 `067b33326c3da90123b86beec613f5a55fcacde9` 的 docs 无差异，保留了当时快照和同步时间。本节为历史记录，当前版本见下方“最新同步”。
 
 每次正式发布必须先检查上游正文；有变化才审查并同步，随后测试和提交应用。镜像使用提交内固定快照，不在构建时追最新。知识网站 Action 继续独立发布 OSS/CDN，不再同步 ECS。完整步骤见 [发布流程](../RELEASING.md)。
+
+## 最新同步（2026-09-11）
+
+已只读核对上游 `OSS_Docs/main` 最新提交 `c80f9f129478fd9c9c7bbab13357944b7f585d02`，并将 79 个概念、66 篇正文固定同步到本地快照。此次正文差异为 `log.md` 新增 2026-09-07 第八批系统集成架构简化记录；ROI 模板与同步前一致，仍为“内容正在建设中”，未发现新增正文。同步后需重启本地服务，运行中的进程才会加载新快照。

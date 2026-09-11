@@ -31,7 +31,7 @@ npm run dev
 
 应用仓库：https://github.com/woshiyjy/HiFun_Agent_WebUI_H5 。知识维护源：https://github.com/woshiyjy/OSS_Docs 。
 
-知识网站独立发布。应用正式发布前检查知识源，审查并固定快照，随后测试、提交，再用同一提交构建镜像。详见 [发布流程](RELEASING.md) 和 [知识更新说明](knowledge/README.md)。
+知识网站独立发布。应用正式发布前检查知识源，审查并固定快照，随后测试、提交，再用同一提交构建镜像。当前内置快照见 [知识更新说明](knowledge/README.md)，最新固定提交为 `c80f9f129478fd9c9c7bbab13357944b7f585d02`。详见 [发布流程](RELEASING.md)。
 
 内部项目记忆、运维记录、凭据、会话、原图与历史验证材料仅在本地保留，不属于公开仓库。临时对象清理依赖应用运行和失败重试，目前没有独立于应用的 OSS 生命周期兜底。
 
