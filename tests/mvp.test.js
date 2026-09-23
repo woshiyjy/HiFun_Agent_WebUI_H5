@@ -105,7 +105,18 @@ test('演示模式保留图片输入，但不启动诊断胶囊', async () => {
   const responder = createResponder({ diagnose: async () => { calls++; } });
   const result = await responder({ text: '叶子怎么了', image: { id: randomUUID(), buffer: await picture() }, history: [], emit: e => events.push(e) });
   assert.equal(calls, 0); assert.equal(result.route, null);
-  assert.match(events.filter(e => e.type === 'delta').map(e => e.text).join(''), /没有对这张图片做病害识别/);
+  assert.match(events.filter(e => e.type === 'delta').map(e => e.text).join(''), /没有调用真实模型分析这张图片/);
+});
+
+test('演示模式的能力介绍问题会显示身份和能力范围', async () => {
+  const events = [];
+  const responder = createResponder({ mode: 'demo' });
+  await responder({ text: '你能帮我做什么？', history: [], emit: e => events.push(e) });
+  const answer = events.filter(e => e.type === 'delta').map(e => e.text).join('');
+  assert.match(answer, /我是嗨番小智/);
+  assert.match(answer, /嗨番集团是一家专注于口感番茄的产业运营商/);
+  assert.match(answer, /不提供正式病害诊断/);
+  assert.match(answer, /本地演示回复/);
 });
 
 test('两份合成信封通过 Schema，摘要或损坏结果不能冒充信封', async () => {

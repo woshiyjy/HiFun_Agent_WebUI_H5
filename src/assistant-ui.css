@@ -330,7 +330,7 @@ body {
   width: fit-content;
   max-width: min(100%, 620px);
   border: 1px solid var(--user-bubble-border);
-  border-radius: 12px 4px 12px 12px;
+  border-radius: 12px;
   background: var(--user-bubble);
   color: var(--user-bubble-foreground);
   padding: 8px 12px;
