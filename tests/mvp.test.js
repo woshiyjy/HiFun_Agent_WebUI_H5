@@ -113,7 +113,7 @@ test('演示模式的能力介绍问题会显示身份和能力范围', async ()
   const responder = createResponder({ mode: 'demo' });
   await responder({ text: '你能帮我做什么？', history: [], emit: e => events.push(e) });
   const answer = events.filter(e => e.type === 'delta').map(e => e.text).join('');
-  assert.match(answer, /我是嗨番小智/);
+  assert.match(answer, /我是嗨番Agent/);
   assert.match(answer, /嗨番集团是一家专注于口感番茄的产业运营商/);
   assert.match(answer, /不提供正式病害诊断/);
   assert.match(answer, /本地演示回复/);

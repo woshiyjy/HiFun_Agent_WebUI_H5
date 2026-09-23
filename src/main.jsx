@@ -173,7 +173,7 @@ function App() {
     } finally { setBusy(false); busyRef.current = false; setPhase(''); }
   }
   return <AssistantRuntimeProvider runtime={runtime}><div className="app-shell">
-    <header className="header"><a className="brand" href="/" aria-label="嗨番小智首页"><img className="brand-mascot" src="/xiaozhi-user.png" alt=""/><span>嗨番小智<small>嗨番集团 · 口感番茄产业助手</small></span></a><div className="header-tools"><a href="https://docs.wehifun.cn/" target="_blank" rel="noopener noreferrer" className="knowledge-link">知识库 ↗</a><button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={dark ? '切换到亮色模式' : '切换到深色模式'} title={dark ? '切换到亮色模式' : '切换到深色模式'}><Icon name={dark ? 'sun' : 'moon'}/></button></div></header>
+    <header className="header"><a className="brand" href="/" aria-label="嗨番Agent首页"><img className="brand-mascot" src="/hifun-agent-avatar.png" alt=""/><span>嗨番Agent<small>嗨番集团 · 口感番茄产业助手</small></span></a><div className="header-tools"><a href="https://docs.wehifun.cn/" target="_blank" rel="noopener noreferrer" className="knowledge-link">知识库 ↗</a><button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={dark ? '切换到亮色模式' : '切换到深色模式'} title={dark ? '切换到亮色模式' : '切换到深色模式'}><Icon name={dark ? 'sun' : 'moon'}/></button></div></header>
     <main className="main">
       {session?.mode === 'demo' && <div className="demo-banner"><span>本地演示</span>当前用于体验对话、知识查询和图片内容理解。</div>}
       <div className="conversation" ref={viewport} tabIndex={0} aria-label="对话内容"><div ref={content}>
@@ -187,7 +187,7 @@ function App() {
         <p className="privacy"><Icon name="clock"/>两小时无交互后失效；有效期内可在此浏览器恢复。<span>图片理解仅供参考。</span></p>
       </div>
     </main>
-    <footer>嗨番小智 · 嗨番集团</footer>
+    <footer>嗨番Agent · 嗨番集团</footer>
   </div></AssistantRuntimeProvider>;
 }
 createRoot(document.getElementById('root')).render(<App/>);

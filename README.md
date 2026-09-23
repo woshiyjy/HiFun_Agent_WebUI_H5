@@ -1,8 +1,8 @@
-# 嗨番小智 · HiFun Agent H5
+# 嗨番Agent · HiFun Agent H5
 
 嗨番集团是一家专注于口感番茄的产业运营商。
 
-嗨番小智采用 React/Vite H5、Express 后端和 Pi Agent，并以 `@assistant-ui/react` 管理对话运行时和消息呈现。用户请求先进入 Agent；图片直接提供给主模型理解，Agent 可按需调用只读知识检索与续读工具。当前版本不接入正式病害诊断能力。
+嗨番Agent采用 React/Vite H5、Express 后端和 Pi Agent，并以 `@assistant-ui/react` 管理对话运行时和消息呈现。用户请求先进入 Agent；图片直接提供给主模型理解，Agent 可按需调用只读知识检索与续读工具。当前版本不接入正式病害诊断能力。
 
 ## 本地运行
 
@@ -37,7 +37,7 @@ npm run dev
 
 ## 主模型与回答显示
 
-下一代码版本默认接入 DeepSeek V4.1 Flash，使用模型 ID `deepseek-flash`、OpenAI 兼容接口 `https://api.deepseek.com`，服务端变量为 `MODEL_PROVIDER`、`MODEL_NAME`、`MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_ENABLE_THINKING`、`MODEL_REASONING_EFFORT` 和 `MODEL_MAX_TOKENS`。思考模式默认开启、推理强度为 high，应用保留32k上下文预算和单次4096输出 token 上限；这低于模型服务能力上限，用于控制单轮输出。旧百炼配置仍可通过显式设置 `MODEL_PROVIDER=bailian` 回退。公众 H5 当前不加载或调用独立诊断胶囊。
+当前代码接入 DeepSeek V4.1 Flash，使用模型 ID `deepseek-flash`、OpenAI 兼容接口 `https://api.deepseek.com`，服务端变量为 `MODEL_PROVIDER`、`MODEL_NAME`、`MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_ENABLE_THINKING`、`MODEL_REASONING_EFFORT` 和 `MODEL_MAX_TOKENS`。思考模式默认开启、推理强度为 high，应用保留32k上下文预算和单次4096输出 token 上限；这低于模型服务能力上限，用于控制单轮输出。旧百炼配置仍可通过显式设置 `MODEL_PROVIDER=bailian` 回退。公众 H5 当前不加载或调用独立诊断胶囊。
 
 切换生产环境前，须将 DeepSeek API Key 安全配置到公众版服务端；密钥不得放入浏览器环境、Git 或对话。DeepSeek 真实模型调用和 ECS 切换以独立验证记录为准。
 

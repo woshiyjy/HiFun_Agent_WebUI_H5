@@ -8,7 +8,8 @@ try {
  assert.ok(ready,'server must start');
  const base='http://127.0.0.1:1842';
  const page=await fetch(base);assert.equal(page.status,200);assert.match(await page.text(),/theme-init.js/);
- assert.equal((await fetch(base+'/xiaozhi-user.png')).status,200);
+ assert.equal((await fetch(base+'/hifun-agent-avatar.png')).status,200);
+ assert.equal((await fetch(base+'/user-avatar.png')).status,200);
  const r=await fetch(base+'/api/session',{method:'POST',headers:{'X-Tomato-Client':'1',Origin:'https://www.wehifun.cn'}});
  assert.equal(r.status,200);assert.match(r.headers.get('set-cookie'),/Secure/);
  JSON.parse(readFileSync('knowledge/snapshot.json','utf8'));

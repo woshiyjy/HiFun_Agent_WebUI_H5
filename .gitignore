@@ -21,7 +21,8 @@
 !/deploy/
 !/.github/
 /public/*
-!/public/xiaozhi-user.png
+!/public/hifun-agent-avatar.png
+!/public/user-avatar.png
 !/public/theme-init.js
 /knowledge/*
 !/knowledge/source/

@@ -19,7 +19,7 @@ export function modelSettings(env = {}, mode = 'live') {
     thinking: thinking === 'true',
     model: isDeepSeek
       ? { id: mode === 'demo' ? 'local-demo' : env.MODEL_NAME || 'deepseek-flash', name: 'DeepSeek V4.1 Flash', api: 'openai-completions', provider, baseUrl: env.MODEL_BASE_URL || 'https://api.deepseek.com', apiKeyEnv: 'MODEL_API_KEY', reasoning: true, input: ['text', 'image'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 32768, maxTokens, reasoningEffort, compat: { supportsStore: false, supportsDeveloperRole: false, supportsReasoningEffort: false, maxTokensField: 'max_tokens', thinkingFormat: 'deepseek', requiresReasoningContentOnAssistantMessages: true } }
-      : { id: mode === 'demo' ? 'local-demo' : env.BAILIAN_MODEL || 'qwen3.7-plus', name: '嗨番小智', api: 'openai-completions', provider, baseUrl: env.BAILIAN_BASE_URL || 'http://127.0.0.1', apiKeyEnv: 'BAILIAN_API_KEY', reasoning: true, input: ['text', 'image'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 32768, maxTokens, compat: { supportsStore: false, supportsDeveloperRole: false, supportsReasoningEffort: false, maxTokensField: 'max_tokens', thinkingFormat: 'qwen' } },
+      : { id: mode === 'demo' ? 'local-demo' : env.BAILIAN_MODEL || 'qwen3.7-plus', name: '嗨番Agent', api: 'openai-completions', provider, baseUrl: env.BAILIAN_BASE_URL || 'http://127.0.0.1', apiKeyEnv: 'BAILIAN_API_KEY', reasoning: true, input: ['text', 'image'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 32768, maxTokens, compat: { supportsStore: false, supportsDeveloperRole: false, supportsReasoningEffort: false, maxTokensField: 'max_tokens', thinkingFormat: 'qwen' } },
   };
 }
 

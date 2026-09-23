@@ -18,7 +18,7 @@ for (const question of ['你是谁，嗨番集团是做什么的？', '根据嗨
   records.push({ question, answer, evidence: receipt.evidence, elapsedMs: Date.now() - started });
   console.log(JSON.stringify(records.at(-1)));
 }
-assert.match(records[0].answer, /嗨番小智/);
+assert.match(records[0].answer, /嗨番Agent/);
 assert.doesNotMatch(records[0].answer, /业务覆盖|品牌营销|渠道建设/);
 for (const r of records) assert.doesNotMatch(r.answer, /available|placeholder/);
 assert.match(records[1].answer, /https:\/\/docs\.wehifun\.cn\//);

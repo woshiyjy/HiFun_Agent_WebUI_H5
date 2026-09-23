@@ -26,8 +26,8 @@ function MessageRow() {
   const role = useAuiState(state => state.message.role);
   const user = role === 'user';
   return <MessagePrimitive.Root className={`message flex w-full items-start gap-3 ${role}`}>
-    <div className={`message-avatar${user ? ' user-avatar' : ''}`} aria-hidden="true">{user ? <span>你</span> : <img src="/xiaozhi-user.png" alt=""/>}</div>
-    <div className="message-body">{!user && <div className="message-label">嗨番小智</div>}<MessagePrimitive.Parts components={{ Text: TextPart, Image: ImagePart }} /></div>
+    <div className={`message-avatar${user ? ' user-avatar' : ''}`} aria-hidden="true"><img src={user ? '/user-avatar.png' : '/hifun-agent-avatar.png'} alt=""/></div>
+    <div className="message-body">{!user && <div className="message-label">嗨番Agent</div>}<MessagePrimitive.Parts components={{ Text: TextPart, Image: ImagePart }} /></div>
   </MessagePrimitive.Root>;
 }
 
