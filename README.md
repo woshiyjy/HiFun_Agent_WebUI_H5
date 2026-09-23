@@ -37,7 +37,9 @@ npm run dev
 
 ## 主模型与回答显示
 
-主 Agent 默认使用 qwen3.7-plus；可通过服务端 BAILIAN_MODEL 显式配置，BAILIAN_ENABLE_THINKING 默认为 false。应用当前保留32k上下文预算和单次2048输出token预算，并非模型服务能力上限。此公众 H5 当前不加载或调用独立诊断胶囊。
+下一代码版本默认接入 DeepSeek V4.1 Flash，使用模型 ID `deepseek-flash`、OpenAI 兼容接口 `https://api.deepseek.com`，服务端变量为 `MODEL_PROVIDER`、`MODEL_NAME`、`MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_ENABLE_THINKING`、`MODEL_REASONING_EFFORT` 和 `MODEL_MAX_TOKENS`。思考模式默认开启、推理强度为 high，应用保留32k上下文预算和单次4096输出 token 上限；这低于模型服务能力上限，用于控制单轮输出。旧百炼配置仍可通过显式设置 `MODEL_PROVIDER=bailian` 回退。公众 H5 当前不加载或调用独立诊断胶囊。
+
+切换生产环境前，须将 DeepSeek API Key 安全配置到公众版服务端；密钥不得放入浏览器环境、Git 或对话。DeepSeek 真实模型调用和 ECS 切换以独立验证记录为准。
 
 Agent 完成工具调用后，通过 complete_answer 检查回答类别和依据，随后进入无工具的正文流式生成。原始思考和工具参数不展示；前端只显示可展开的处理状态。真实来源链接由后端添加。硬阻断和无知识正文场景使用固定提示。依据检查不等于逐句事实审核，流式生成仍需业务质量验收。
 

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { Agent } from '@earendil-works/pi-agent-core';
 import { AssistantMessageEventStream, Type } from '@earendil-works/pi-ai';
-import { modelSettings, modelStream, streamTextFilter } from './model.js';
+import { modelSettings, modelStream, streamTextFilter, isValidModelEndpoint } from './model.js';
 import { meteredStream } from './quota.js';
 import { AppError } from './store.js';
 import { knowledge, searchKnowledge, readKnowledge, knowledgeEvidence } from './knowledge.js';
@@ -59,7 +59,7 @@ export function createResponder({ mode = 'demo', diagnose, env = process.env, st
     const rawStream = streamFn || modelStream(env, thinking);
     const callModel = quota && mode !== 'demo' ? meteredStream(rawStream, quota, e => { meteringError = e; }) : rawStream;
     const finalController = new AbortController();
-    if (mode !== 'demo' && !streamFn && (!env.BAILIAN_API_KEY || !model.id || !/^https:\/\/[a-z0-9.-]+\.aliyuncs\.com\//.test(model.baseUrl))) throw new AppError('MODEL_CONFIG', '对话模型尚未配置。', 503);
+    if (mode !== 'demo' && !streamFn && (!env[model.apiKeyEnv] || !model.id || !isValidModelEndpoint(model.provider, model.baseUrl))) throw new AppError('MODEL_CONFIG', '对话模型尚未配置。', 503);
     let failure, submitted, fixedAnswer, searched = false;
     const sources = new Map(); const trace = [];
     const tools = [{
