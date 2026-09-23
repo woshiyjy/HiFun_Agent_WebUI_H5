@@ -1,9 +1,7 @@
-import React, { useContext } from 'react';
+import React from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MessagePrimitive, ThreadPrimitive, useAuiState } from '@assistant-ui/react';
-
-const AvatarContext = React.createContext({ userAvatar: null });
 
 function SourceLink({ href, children }) {
   try {
@@ -26,14 +24,13 @@ function ImagePart() {
 
 function MessageRow() {
   const role = useAuiState(state => state.message.role);
-  const avatar = useContext(AvatarContext);
   const user = role === 'user';
   return <MessagePrimitive.Root className={`message flex w-full items-start gap-3 ${role}`}>
-    <div className="message-avatar" aria-hidden="true"><img src={user ? (avatar.userAvatar || '/user-avatar.svg') : '/xiaozhi-user.png'} alt="" /></div>
+    <div className={`message-avatar${user ? ' user-avatar' : ''}`} aria-hidden="true">{user ? <span>你</span> : <img src="/xiaozhi-user.png" alt=""/>}</div>
     <div className="message-body"><div className="message-label">{user ? '你' : '嗨番小智'}</div><MessagePrimitive.Parts components={{ Text: TextPart, Image: ImagePart }} /></div>
   </MessagePrimitive.Root>;
 }
 
-export function MessageThread({ userAvatar }) {
-  return <AvatarContext.Provider value={{ userAvatar }}><ThreadPrimitive.Root className="aui-thread flex w-full flex-col"><div className="aui-thread-viewport flex flex-col gap-5"><ThreadPrimitive.Messages>{() => <MessageRow />}</ThreadPrimitive.Messages></div></ThreadPrimitive.Root></AvatarContext.Provider>;
+export function MessageThread() {
+  return <ThreadPrimitive.Root className="aui-thread flex w-full flex-col"><div className="aui-thread-viewport flex flex-col gap-5"><ThreadPrimitive.Messages>{() => <MessageRow />}</ThreadPrimitive.Messages></div></ThreadPrimitive.Root>;
 }

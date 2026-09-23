@@ -21,7 +21,7 @@ async function api(url, options = {}) {
 }
 function readSaved() { try { return JSON.parse(localStorage.getItem(STORAGE)); } catch { return null; } }
 function Icon({ name, ...props }) {
-  const paths = { upload: <><path d="M12 16V4m-4 4 4-4 4 4"/><path d="M4 15v5h16v-5"/></>, arrow: <><path d="m5 12 7-7 7 7M12 5v15"/></>, close: <path d="m6 6 12 12M6 18 18 6"/>, leaf: <><path d="M19 4C8 3 3 9 7 15s13 1 12-11Z"/><path d="m5 20 9-10"/></>, image: <><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><path d="m3 17 6-6 4 4 3-3 5 5"/></>, clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></> };
+  const paths = { upload: <><path d="M12 16V4m-4 4 4-4 4 4"/><path d="M4 15v5h16v-5"/></>, arrow: <><path d="m5 12 7-7 7 7M12 5v15"/></>, close: <path d="m6 6 12 12M6 18 18 6"/>, leaf: <><path d="M19 4C8 3 3 9 7 15s13 1 12-11Z"/><path d="m5 20 9-10"/></>, image: <><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><path d="m3 17 6-6 4 4 3-3 5 5"/></>, clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>, moon: <path d="M20.9 13.1A8.9 8.9 0 0 1 10.9 3.1 9 9 0 1 0 20.9 13.1Z"/>, sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></> };
   return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>{paths[name]}</svg>;
 }
 function initialTheme() { try { return localStorage.getItem('hifun-theme') || 'system'; } catch { return 'system'; } }
@@ -35,7 +35,7 @@ function App() {
   const [theme, setTheme] = useState(initialTheme), [dark, setDark] = useState(document.documentElement.dataset.theme === 'dark');
   useEffect(() => {
     const media = matchMedia('(prefers-color-scheme: dark)');
-    const apply = () => { const value = theme === 'system' ? media.matches : theme === 'dark'; setDark(value); document.documentElement.dataset.theme = value ? 'dark' : 'light'; document.querySelector('meta[name="theme-color"]').content = value ? '#14251e' : '#f4f6f5'; };
+    const apply = () => { const value = theme === 'system' ? media.matches : theme === 'dark'; setDark(value); document.documentElement.dataset.theme = value ? 'dark' : 'light'; document.querySelector('meta[name="theme-color"]').content = value ? '#0f172a' : '#f8fafc'; };
     apply(); media.addEventListener('change', apply); return () => media.removeEventListener('change', apply);
   }, [theme]);
   function toggleTheme() { const next = dark ? 'light' : 'dark'; setTheme(next); try { localStorage.setItem('hifun-theme', next); } catch {} }
@@ -173,11 +173,11 @@ function App() {
     } finally { setBusy(false); busyRef.current = false; setPhase(''); }
   }
   return <AssistantRuntimeProvider runtime={runtime}><div className="app-shell">
-    <header className="header"><a className="brand" href="/" aria-label="嗨番小智首页"><img className="brand-mascot" src="/xiaozhi-user.png" alt=""/><span>嗨番小智<small>嗨番集团 · 口感番茄产业助手</small></span></a><div className="header-tools"><a href="https://docs.wehifun.cn/" target="_blank" rel="noopener noreferrer" className="knowledge-link">知识库 ↗</a><button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={dark ? '切换到亮色模式' : '切换到深色模式'} title={dark ? '切换到亮色模式' : '切换到深色模式'}>{dark ? '☀' : '☾'}</button></div></header>
+    <header className="header"><a className="brand" href="/" aria-label="嗨番小智首页"><img className="brand-mascot" src="/xiaozhi-user.png" alt=""/><span>嗨番小智<small>嗨番集团 · 口感番茄产业助手</small></span></a><div className="header-tools"><a href="https://docs.wehifun.cn/" target="_blank" rel="noopener noreferrer" className="knowledge-link">知识库 ↗</a><button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={dark ? '切换到亮色模式' : '切换到深色模式'} title={dark ? '切换到亮色模式' : '切换到深色模式'}><Icon name={dark ? 'sun' : 'moon'}/></button></div></header>
     <main className="main">
       {session?.mode === 'demo' && <div className="demo-banner"><span>本地演示</span>当前用于体验对话、知识查询和图片内容理解。</div>}
       <div className="conversation" ref={viewport} tabIndex={0} aria-label="对话内容"><div ref={content}>
-        {messages.length === 0 ? <WelcomePanel onSuggestion={question => { setText(question); document.getElementById('question')?.focus(); }} /> : <MessageThread userAvatar="/user-avatar.svg" />}
+        {messages.length === 0 ? <WelcomePanel onSuggestion={question => { setText(question); document.getElementById('question')?.focus(); }} /> : <MessageThread />}
         <ProcessPanel busy={busy} phase={phase} steps={processSteps} />
         </div>
       </div>
