@@ -21,7 +21,7 @@ async function api(url, options = {}) {
 }
 function readSaved() { try { return JSON.parse(localStorage.getItem(STORAGE)); } catch { return null; } }
 function Icon({ name, ...props }) {
-  const paths = { upload: <><path d="M12 16V4m-4 4 4-4 4 4"/><path d="M4 15v5h16v-5"/></>, arrow: <><path d="m5 12 7-7 7 7M12 5v15"/></>, close: <path d="m6 6 12 12M6 18 18 6"/>, leaf: <><path d="M19 4C8 3 3 9 7 15s13 1 12-11Z"/><path d="m5 20 9-10"/></>, image: <><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><path d="m3 17 6-6 4 4 3-3 5 5"/></>, clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>, moon: <path d="M20.9 13.1A8.9 8.9 0 0 1 10.9 3.1 9 9 0 1 0 20.9 13.1Z"/>, sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></> };
+  const paths = { upload: <><path d="M12 16V4m-4 4 4-4 4 4"/><path d="M4 15v5h16v-5"/></>, arrow: <><path d="m5 12 7-7 7 7M12 5v15"/></>, close: <path d="m6 6 12 12M6 18 18 6"/>, leaf: <><path d="M19 4C8 3 3 9 7 15s13 1 12-11Z"/><path d="m5 20 9-10"/></>, image: <><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><path d="m3 17 6-6 4 4 3-3 5 5"/></>, moon: <path d="M20.9 13.1A8.9 8.9 0 0 1 10.9 3.1 9 9 0 1 0 20.9 13.1Z"/>, sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></> };
   return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>{paths[name]}</svg>;
 }
 function initialTheme() { try { return localStorage.getItem('hifun-theme') || 'system'; } catch { return 'system'; } }
@@ -184,10 +184,9 @@ function App() {
       <div className="composer-area">
         <ConversationNotices paused={paused} busy={busy} onResume={resume} error={error} storageError={storageError} pending={pending} onRecover={recover} />
         <Composer input={input} file={file} preview={preview} text={text} busy={busy} pending={pending} session={session} onTextChange={event => setText(event.target.value)} onFileChange={selectFile} onRemoveFile={() => setFile(null)} onSubmit={send} />
-        <p className="privacy"><Icon name="clock"/>两小时无交互后失效；有效期内可在此浏览器恢复。<span>图片理解仅供参考。</span></p>
+        <p className="privacy">两小时无交互后失效；有效期内可在此浏览器恢复。<span>图片理解仅供参考。</span></p>
       </div>
     </main>
-    <footer>嗨番Agent · 嗨番集团</footer>
   </div></AssistantRuntimeProvider>;
 }
 createRoot(document.getElementById('root')).render(<App/>);

@@ -18,7 +18,7 @@ test('具体设施查询命中正确文章且保留来源，价格不冒充实�
   assert.ok(found[0].url.endsWith('.html'));
   const price = searchKnowledge(knowledge, '全年产销价格趋势')[0];
   assert.match(price.date, /2026-06-24/);
-  assert.ok(price.body.length <= 3600);
+  assert.ok(price.body.length <= 900);
 });
 test('无关问题不牵强引用；任意网址和文件路径不能驱动读取', () => {
   assert.deepEqual(searchKnowledge(knowledge, '火星轨道速度'), []);
@@ -26,12 +26,23 @@ test('无关问题不牵强引用；任意网址和文件路径不能驱动读�
 });
 
 
-test('模型资料投影只含用户可读状态，并保留短文章完整正文', () => {
+test('检索摘要长度受限且资料投影只含用户可读状态', () => {
   const found = searchKnowledge(knowledge, '宁夏小拱棚越夏茬口');
-  assert.equal(found[0].body, knowledge.find(d => d.id === found[0].id).body);
+  assert.ok(found[0].body.length <= 900);
+  assert.match(found[0].body, /宁夏|越夏|茬口/);
   const serialized = JSON.stringify(knowledgeEvidence(searchKnowledge(knowledge, '灌溉首部')));
   assert.doesNotMatch(serialized, /placeholder|available|糖度高/);
   assert.match(serialized, /正在建设中/);
+});
+
+test('检索默认覆盖更多候选，点名品种优先且摘要受长度限制', () => {
+  const process = searchKnowledge(knowledge, '小番茄采后处理全流程步骤');
+  assert.equal(process.length, 12);
+  assert.ok(process.some(doc => /预冷/.test(doc.title)));
+  assert.ok(process.some(doc => /分选|分拣/.test(doc.title)));
+  assert.ok(process.every(doc => doc.body.length <= 900));
+  assert.equal(searchKnowledge(knowledge, '采后流程', 100).length, 12);
+  assert.equal(searchKnowledge(knowledge, '高俪红的品种特点和种植注意事项')[0].title, '高俪红');
 });
 
 test('长问题中明确品种名称优先命中该品种',()=>{ assert.equal(searchKnowledge(knowledge,'请详细介绍釜山88的品种特点和种植注意事项')[0].title,'釜山88'); });

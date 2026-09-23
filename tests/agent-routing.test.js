@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { AssistantMessageEventStream } from '@earendil-works/pi-ai';
 import { createResponder } from '../server/responder.js';
 
-function scripted(steps, finalText = '完成') {
+function scripted(steps, finalText = '完成', observeContext = () => {}) {
   let index = 0;
   return (model, context) => {
+    observeContext(context);
     const final = context.tools?.length === 0;
     const item = final ? { text: finalText } : (steps[index++] || { text: '完成' });
     const stream = new AssistantMessageEventStream();
@@ -67,4 +68,84 @@ test('暂未接入病害诊断时，返回清楚的能力边界说明', async ()
   const respond = createResponder({ mode: 'live', streamFn: scripted([{ tools: [{ name: 'complete_answer', args: { kind: 'diagnosis', sourceIds: [] } }] }]) });
   await respond({ text: '请诊断图片', image: { id: 'image-one', buffer: Buffer.from('test'), mime: 'image/jpeg' }, emit: event => events.push(event) });
   assert.match(events.filter(event => event.type === 'delta').map(event => event.text).join(''), /暂不提供番茄病害诊断/);
+});
+
+test('Agent 仅暴露只读知识工具和回答核验工具，不提供系统操作能力', async () => {
+  let exposedTools = [];
+  const respond = createResponder({
+    mode: 'live',
+    streamFn: scripted([{ tools: [{ name: 'complete_answer', args: { kind: 'conversation', sourceIds: [] } }] }], '你好。', context => {
+      if (context.tools?.length) exposedTools = context.tools.map(tool => tool.name);
+    }),
+  });
+  await respond({ text: '你好', emit: () => {} });
+  assert.deepEqual(exposedTools, ['search_knowledge', 'read_knowledge', 'complete_answer']);
+});
+
+test('read_knowledge 只能打开本轮检索已经返回的文档', async () => {
+  const events = [];
+  const respond = createResponder({
+    mode: 'live',
+    search: () => [{ id: 'knowledge/allowed', title: '公开资料', type: '知识', url: 'https://docs.wehifun.cn/allowed.html', status: 'available', body: '公开正文' }],
+    streamFn: scripted([
+      { tools: [{ name: 'search_knowledge', args: { query: '公开资料' } }] },
+      { tools: [{ name: 'read_knowledge', args: { id: '../../.env' } }] },
+      { tools: [{ name: 'complete_answer', args: { kind: 'conversation', sourceIds: [] } }] },
+    ], '你好。'),
+  });
+  const result = await respond({ text: '你好', emit: event => events.push(event) });
+  assert.match(events.filter(event => event.type === 'delta').map(event => event.text).join(''), /你好/);
+  assert.equal(result.evidence.some(item => item.tool === 'read_knowledge'), false);
+});
+
+test('一般农业知识可在检索后明确标注为一般参考', async () => {
+  const events = [];
+  let finalPrompt = '';
+  const respond = createResponder({
+    mode: 'live', search: () => [],
+    streamFn: scripted([
+      { tools: [{ name: 'search_knowledge', args: { query: '提高番茄坐果率' } }] },
+      { tools: [{ name: 'complete_answer', args: { kind: 'general_reference', sourceIds: [] } }] },
+    ], '一般参考（非嗨番知识库结论）：可先关注花期环境、水分稳定和植株营养平衡。', context => {
+      if (!context.tools?.length) finalPrompt = context.systemPrompt;
+    }),
+  });
+  await respond({ text: '一般有哪些方法可以提高番茄坐果率？', emit: event => events.push(event) });
+  const answer = events.filter(event => event.type === 'delta').map(event => event.text).join('');
+  assert.match(answer, /^一般参考（非嗨番知识库结论）/);
+  assert.match(finalPrompt, /一般参考.*分开标注/);
+});
+
+test('具体品种没有对应资料时不能降级为一般参考', async () => {
+  const events = [];
+  const respond = createResponder({ mode: 'live', search: () => [], streamFn: scripted([
+    { tools: [{ name: 'search_knowledge', args: { query: '高俪红品种参数' } }] },
+    { tools: [{ name: 'complete_answer', args: { kind: 'general_reference', sourceIds: [] } }] },
+  ], '一般参考：高俪红可能具有以下参数……') });
+  await respond({ text: '高俪红的品种特点和种植注意事项是什么？', emit: event => events.push(event) });
+  const answer = events.filter(event => event.type === 'delta').map(event => event.text).join('');
+  assert.match(answer, /没有找到可以支持这个问题的正文资料/);
+  assert.doesNotMatch(answer, /可能具有以下参数/);
+});
+
+test('文件和图表制作请求固定返回文字能力边界', async () => {
+  const events = [];
+  const respond = createResponder({ mode: 'live', streamFn: scripted([
+    { tools: [{ name: 'complete_answer', args: { kind: 'knowledge', sourceIds: [] } }] },
+  ], '这段模型草稿不能发布。') });
+  await respond({ text: '请生成一份采后流程 PDF 报告并画个图表', emit: event => events.push(event) });
+  const answer = events.filter(event => event.type === 'delta').map(event => event.text).join('');
+  assert.match(answer, /只提供聊天中的流式文字回答/);
+  assert.doesNotMatch(answer, /模型草稿/);
+});
+
+test('文字预览请求不会误拦截用户上传图片的理解', async () => {
+  const events = [];
+  const respond = createResponder({ mode: 'live', streamFn: scripted([
+    { tools: [{ name: 'complete_answer', args: { kind: 'image_description', sourceIds: [] } }] },
+  ], '这张图片里是一株番茄。') });
+  await respond({ text: '给我看看这张图片', image: { id: 'image-one', buffer: Buffer.from('test'), mime: 'image/jpeg' }, emit: event => events.push(event) });
+  const answer = events.filter(event => event.type === 'delta').map(event => event.text).join('');
+  assert.match(answer, /这张图片里是一株番茄/);
+  assert.doesNotMatch(answer, /不生成报告或文件/);
 });
