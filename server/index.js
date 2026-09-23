@@ -5,7 +5,6 @@ import express from 'express';
 import { createStore } from './store.js';
 import { createApp } from './app.js';
 import { createResponder } from './responder.js';
-import { createDiagnosis } from './diagnosis.js';
 import { loadConfig } from './config.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -20,8 +19,10 @@ const port = Number(process.env.PORT || 1842);
 const production = process.env.NODE_ENV === 'production';
 if (production && process.env.PUBLIC_ORIGIN !== 'https://www.wehifun.cn') throw new Error('Production requires the approved HTTPS origin.');
 const store = await createStore(path.join(root, '.runtime'), { tokenLimit: Number(process.env.SESSION_TOKEN_LIMIT || 10000000) });
-const diagnose = createDiagnosis({ mode, env: config, journalDir: path.join(root, '.runtime/cloud') });
-const app = createApp({ store, responder: createResponder({ mode, diagnose, env: config }), mode, origin: production ? process.env.PUBLIC_ORIGIN : `http://${host}:${port}`, production });
+// Image input remains available to the main vision model. The independent
+// diagnosis capsule is intentionally not wired into this public build;
+// it will return later through a separately reviewed MCP service.
+const app = createApp({ store, responder: createResponder({ mode, env: config }), mode, origin: production ? process.env.PUBLIC_ORIGIN : `http://${host}:${port}`, production });
 let vite;
 if (!production) {
   const { createServer } = await import('vite');
@@ -37,13 +38,5 @@ if (!production) {
 }
 const server = app.listen(port, host, () => console.log(`Tomato H5 (${mode}) Local: http://${host}:${port}`));
 const sweep = setInterval(() => store.sweep().catch(() => console.error('Temporary data cleanup failed')), 60000);
-let cloudSweeping = false;
-const cloudSweep = setInterval(async () => {
-  if (cloudSweeping) return;
-  cloudSweeping = true;
-  try { const pending = await diagnose.sweep(); if (pending) console.log(`Temporary cloud cleanup pending: ${pending}`); }
-  catch { console.error('Temporary cloud cleanup pending'); }
-  finally { cloudSweeping = false; }
-}, 60000);
-async function stop() { clearInterval(sweep); clearInterval(cloudSweep); await vite?.close(); server.close(() => process.exit(0)); }
+async function stop() { clearInterval(sweep); await vite?.close(); server.close(() => process.exit(0)); }
 process.on('SIGTERM', stop); process.on('SIGINT', stop);

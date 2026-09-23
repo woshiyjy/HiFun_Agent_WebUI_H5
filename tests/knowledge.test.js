@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { knowledge, searchKnowledge, knowledgeEvidence } from '../server/knowledge.js';
+import { knowledge, searchKnowledge, readKnowledge, knowledgeEvidence } from '../server/knowledge.js';
 
 test('知识源保留内容状态，不把占位标题当事实正文', () => {
   assert.equal(knowledge.length, 79);
@@ -35,3 +35,14 @@ test('模型资料投影只含用户可读状态，并保留短文章完整正�
 });
 
 test('长问题中明确品种名称优先命中该品种',()=>{ assert.equal(searchKnowledge(knowledge,'请详细介绍釜山88的品种特点和种植注意事项')[0].title,'釜山88'); });
+test('知识库只能只读继续阅读，长文支持偏移和章节', () => {
+  const hit = searchKnowledge(knowledge, '釜山88')[0];
+  const first = readKnowledge(knowledge, hit.id, { maxChars: 500 });
+  assert.equal(first.id, hit.id);
+  assert.ok(first.body.length <= 500);
+  if (first.nextOffset !== null) {
+    const next = readKnowledge(knowledge, hit.id, { offset: first.nextOffset, maxChars: 500 });
+    assert.equal(next.offset, first.nextOffset);
+  }
+  assert.equal(readKnowledge(knowledge, '../.env'), null);
+});

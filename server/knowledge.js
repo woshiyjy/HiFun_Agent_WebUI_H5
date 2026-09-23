@@ -39,6 +39,17 @@ export function searchKnowledge(docs, query, limit = 3) {
     return { ...doc, description: doc.status === 'placeholder' ? '' : doc.description, score, body: doc.status === 'placeholder' ? '该条目正文正在建设中，不能据其标题或简介推导业务结论。' : (doc.body.length <= 3600 ? doc.body : excerpt.slice(0, 3600)) };
   }).filter(d => d.score >= 4).sort((a,b) => b.score-a.score || a.id.localeCompare(b.id)).slice(0, Math.min(5, Math.max(1, limit)));
 }
+export function readKnowledge(docs, id, { section = null, offset = 0, maxChars = 7200 } = {}) {
+  const doc = docs.find(item => item.id === id);
+  if (!doc) return null;
+  const body = doc.body;
+  const sections = body.split(/(?=^##? )/m).filter(Boolean);
+  const selected = section ? sections.find(value => value.match(/^##?\s+(.+)$/m)?.[1]?.trim() === section || value.includes(section)) : null;
+  const source = selected || body;
+  const start = Math.max(0, Number.isInteger(offset) ? offset : 0);
+  const text = source.slice(start, start + Math.min(12000, Math.max(500, maxChars)));
+  return { ...doc, body: doc.status === 'placeholder' ? '该条目正文正在建设中，不能据其标题或简介推导业务结论。' : text, section: selected ? section : null, offset: start, nextOffset: start + text.length < source.length ? start + text.length : null, totalChars: source.length };
+}
 export const knowledge = await loadKnowledge();
 
 export function knowledgeEvidence(results) { return results.map(d => ({ 标题: d.title, 正文状态: d.status === "placeholder" ? "正在建设中" : "已提供正文，未独立核验", 资料标注日期: d.date, 原文链接: d.url, 参考正文: d.body })); }

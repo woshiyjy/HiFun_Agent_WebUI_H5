@@ -14,18 +14,22 @@
     "node": ">=22.19.0"
   },
   "dependencies": {
+    "@assistant-ui/react": "^0.15.21",
     "@earendil-works/pi-agent-core": "0.85.1",
     "@earendil-works/pi-ai": "0.85.1",
+    "@tailwindcss/vite": "^4.3.3",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
     "express": "5.2.1",
     "helmet": "8.3.0",
+    "lucide-react": "^1.47.0",
     "multer": "2.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-markdown": "10.1.0",
     "remark-gfm": "4.0.1",
     "sharp": "0.35.4",
+    "tailwindcss": "^4.3.3",
     "vite": "8.2.2",
     "yaml": "2.9.0"
   }

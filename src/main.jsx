@@ -1,10 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { AssistantRuntimeProvider, useExternalStoreRuntime } from '@assistant-ui/react';
 import { useConversationScroll } from './useConversationScroll.js';
+import { MessageThread } from './components/MessageThread.jsx';
+import { Composer } from './components/Composer.jsx';
+import { WelcomePanel } from './components/WelcomePanel.jsx';
+import { ProcessPanel } from './components/ProcessPanel.jsx';
+import { ConversationNotices } from './components/ConversationNotices.jsx';
 import './style.css';
 import './theme.css';
+import './tailwind.css';
+import './assistant-ui.css';
 
 const STORAGE = 'tomato-conversation-v1';
 const HEADERS = { 'X-Tomato-Client': '1' };
@@ -19,9 +25,11 @@ function Icon({ name, ...props }) {
   return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>{paths[name]}</svg>;
 }
 function initialTheme() { try { return localStorage.getItem('hifun-theme') || 'system'; } catch { return 'system'; } }
-function SourceLink({ href, children }) {
-  try { const url = new URL(href); if (url.origin === 'https://docs.wehifun.cn' && !url.username && !url.password) return <a href={url.href} target="_blank" rel="noopener noreferrer">{children}</a>; } catch {}
-  return <span>{children}</span>;
+function convertAssistantMessage(message) {
+  const content = [];
+  if (message.text) content.push({ type: 'text', text: message.text });
+  if (message.imageId) content.push({ type: 'image', image: `/api/images/${message.imageId}` });
+  return { id: message.id, role: message.role, content: content.length ? content : [{ type: 'text', text: '' }] };
 }
 function App() {
   const [theme, setTheme] = useState(initialTheme), [dark, setDark] = useState(document.documentElement.dataset.theme === 'dark');
@@ -39,6 +47,8 @@ function App() {
   const input = useRef(), sessionRef = useRef(null), busyRef = useRef(false);
   const [processSteps, setProcessSteps] = useState([]);
   const { viewport, content, paused, resume } = useConversationScroll([messages, phase, busy, error, preview]);
+  const adapter = useMemo(() => ({ messages, convertMessage: convertAssistantMessage, isRunning: busy }), [messages, busy]);
+  const runtime = useExternalStoreRuntime(adapter);
   function status(value) { setPhase(value); setProcessSteps(steps => steps.at(-1) === value ? steps : [...steps, value].slice(-12)); }
   function save(s, list, request = null) {
     try {
@@ -162,29 +172,22 @@ function App() {
       else if (!submitted) { setPending(null); }
     } finally { setBusy(false); busyRef.current = false; setPhase(''); }
   }
-  return <div className="app-shell">
+  return <AssistantRuntimeProvider runtime={runtime}><div className="app-shell">
     <header className="header"><a className="brand" href="/" aria-label="嗨番小智首页"><img className="brand-mascot" src="/xiaozhi-user.png" alt=""/><span>嗨番小智<small>嗨番集团 · 口感番茄产业助手</small></span></a><div className="header-tools"><a href="https://docs.wehifun.cn/" target="_blank" rel="noopener noreferrer" className="knowledge-link">知识库 ↗</a><button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={dark ? '切换到亮色模式' : '切换到深色模式'} title={dark ? '切换到亮色模式' : '切换到深色模式'}>{dark ? '☀' : '☾'}</button></div></header>
     <main className="main">
-      {session?.mode === 'demo' && <div className="demo-banner"><span>本地演示</span>当前用于体验对话和补图流程，尚未接入真实病害诊断。</div>}
+      {session?.mode === 'demo' && <div className="demo-banner"><span>本地演示</span>当前用于体验对话、知识查询和图片内容理解。</div>}
       <div className="conversation" ref={viewport} tabIndex={0} aria-label="对话内容"><div ref={content}>
-        {messages.length === 0 ? <section className="welcome"><img className="welcome-mascot" src="/xiaozhi-user.png" alt="挥手打招呼的嗨番小智"/><span className="eyebrow">你好，我是嗨番小智</span><h1>关于口感番茄，<br/>我们一起聊聊。</h1><p>可以问种植与产业知识，也可以上传图片，<br className="desktop-break"/>一起梳理问题、补充情况，继续追问。</p><div className="suggestions">{['你能帮我做什么？', '我想诊断番茄图片，需要怎么拍、补充哪些情况？', '帮我查查高俪红的品种特点和种植注意事项。'].map(q => <button type="button" key={q} onClick={() => { setText(q); document.getElementById('question')?.focus(); }}>{q}<span>↗</span></button>)}</div><p className="company-intro">嗨番集团是一家专注于口感番茄的产业运营商。</p></section> : <section className="message-list" aria-label="与嗨番小智对话">{messages.map(m => <article className={`message ${m.role}`} key={m.id}><div className="message-label">{m.role === 'user' ? '你' : '嗨番小智'}{m.incomplete && <span className="reply-state">{busy && m.id === `${pending}-reply` ? '生成中' : '回答未完整'}</span>}{m.route && <span className="route-tag">{{ standard: '分析参考', human_machine: '需要补充', block: '暂无法判断' }[m.route]}</span>}</div>{m.imageId && <img className="message-image" src={`/api/images/${m.imageId}`} alt="本次上传的番茄图片" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.hidden = false; }}/ >}{m.imageId && <p hidden className="expired-image">图片已不可用，需要重新查看时请补传。</p>}{m.text && <div className="message-text">{m.role === 'assistant' ? <Markdown remarkPlugins={[remarkGfm]} components={{ a: SourceLink, img: () => null }}>{m.text}</Markdown> : m.text}</div>}</article>)}</section>}
-        {busy && <details className="process"><summary><span className="pulse"/><span role="status">{phase || '正在回答'}</span></summary><ol>{processSteps.map((step,i) => <li key={i}>{step}</li>)}</ol></details>}
+        {messages.length === 0 ? <WelcomePanel onSuggestion={question => { setText(question); document.getElementById('question')?.focus(); }} /> : <MessageThread userAvatar="/user-avatar.svg" />}
+        <ProcessPanel busy={busy} phase={phase} steps={processSteps} />
         </div>
       </div>
       <div className="composer-area">
-        {paused && <button type="button" className="latest" onClick={resume}>{busy ? '正在回答 · 回到最新 ↓' : '回到最新 ↓'}</button>}
-        {error && <div className="error" role="alert">{error}</div>}
-        {storageError && <div className="error" role="alert">浏览器未能保存对话。刷新或关闭后可能无法恢复。</div>}
-        {pending && !busy && <button className="recover" onClick={recover}>恢复上一条回答</button>}
-        <form className="composer" onSubmit={send}>
-          {file && <div className="attachment">{preview && <img src={preview} alt="待上传图片预览"/>}<span>{file.name}</span><button type="button" onClick={() => setFile(null)} aria-label="移除待上传图片"><Icon name="close"/></button></div>}
-          <label className="sr-only" htmlFor="question">向嗨番小智提问</label><textarea id="question" placeholder="问问口感番茄的事，或上传图片聊聊…" value={text} maxLength={4000} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && window.innerWidth > 700) { e.preventDefault(); send(e); } }} disabled={busy} rows={2}/>
-          <div className="composer-tools"><input ref={input} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectFile} tabIndex={-1}/><button type="button" className="upload" onClick={() => input.current.click()} disabled={busy || !!pending}><Icon name="upload"/>添加图片</button><span className="file-hint">每次 1 张 · 最大 8 MB</span><button type="submit" className="send" disabled={busy || !!pending || !session || (!text.trim() && !file)} aria-label="发送消息"><Icon name="arrow"/></button></div>
-        </form>
-        <p className="privacy"><Icon name="clock"/>两小时无交互后失效；有效期内可在此浏览器恢复。<span>图片判断仅供参考。</span></p>
+        <ConversationNotices paused={paused} busy={busy} onResume={resume} error={error} storageError={storageError} pending={pending} onRecover={recover} />
+        <Composer input={input} file={file} preview={preview} text={text} busy={busy} pending={pending} session={session} onTextChange={event => setText(event.target.value)} onFileChange={selectFile} onRemoveFile={() => setFile(null)} onSubmit={send} />
+        <p className="privacy"><Icon name="clock"/>两小时无交互后失效；有效期内可在此浏览器恢复。<span>图片理解仅供参考。</span></p>
       </div>
     </main>
     <footer>嗨番小智 · 嗨番集团</footer>
-  </div>;
+  </div></AssistantRuntimeProvider>;
 }
 createRoot(document.getElementById('root')).render(<App/>);

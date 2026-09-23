@@ -78,14 +78,10 @@ test('有用量的失败请求照常结算；预留不足时不会再次发起�
  assert.equal(calls,1);
 });
 
-test('诊断胶囊内部用量不计入会话，主Agent工具往返仍逐次计入',async t=>{
- const {store}=await fixture(t),quota=store.quota(randomUUID());let calls=0,capsules=0;
- const respond=createResponder({mode:'live',diagnose:async()=>{capsules++;return {output_route:'standard',usage:{totalTokens:999999999}}},streamFn:(m,c)=>{
-   calls++;
-   if(calls===1)return response(m,[{type:'toolCall',id:'d',name:'diagnose_image',arguments:{target:'current'}}],'toolUse',50);
-   if(calls===2)return response(m,[{type:'toolCall',id:'a',name:'complete_answer',arguments:{kind:'diagnosis',sourceIds:[]}}],'toolUse',60);
-   return response(m,[{type:'text',text:'根据图片与诊断证据，请补充发生时间。'}],'stop',70);
- }});
- await respond({text:'请诊断果实',image:{id:'synthetic',buffer:Buffer.from('synthetic'),mime:'image/jpeg'},quota,emit:()=>{}});
- assert.equal(capsules,1);assert.equal(calls,3);assert.equal((await quota.snapshot()).used,180);
+test('图片理解不产生独立胶囊用量', async t => {
+ const {store}=await fixture(t), quota=store.quota(randomUUID()); let capsuleCalls=0;
+ const respond=createResponder({mode:'live', diagnose:async()=>{capsuleCalls++;}, streamFn:(m,c)=>response(m,[{type:'toolCall',id:'a',name:'complete_answer',arguments:{kind:'image_description',sourceIds:[]}}],'toolUse',60)});
+ await assert.rejects(respond({text:'请描述图片',image:{id:'synthetic',buffer:Buffer.from('synthetic'),mime:'image/jpeg'},quota,emit:()=>{}}));
+ assert.equal(capsuleCalls,0);
+ assert.equal((await quota.snapshot()).used,120);
 });

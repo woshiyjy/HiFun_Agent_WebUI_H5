@@ -100,12 +100,11 @@ test('跨站请求、缺少客户端标头、超大正文与图片被拒绝', as
   await assert.rejects(f.store.saveImage(s.sid, Buffer.alloc(8 * 1024 * 1024 + 1)), /8 MB/);
 });
 
-test('Pi 真实 Runtime 执行演示 Tool，并输出明确演示标记', async () => {
+test('演示模式保留图片输入，但不启动诊断胶囊', async () => {
   let calls = 0; const events = [];
-  const responder = createResponder({ diagnose: async () => { calls++; return { output_route: 'human_machine', payload: { demo: true } }; } });
+  const responder = createResponder({ diagnose: async () => { calls++; } });
   const result = await responder({ text: '叶子怎么了', image: { id: randomUUID(), buffer: await picture() }, history: [], emit: e => events.push(e) });
-  assert.equal(calls, 1); assert.equal(result.route, 'human_machine');
-  assert.ok(events.some(e => e.type === 'status' && e.text.includes('分析图片')));
+  assert.equal(calls, 0); assert.equal(result.route, null);
   assert.match(events.filter(e => e.type === 'delta').map(e => e.text).join(''), /没有对这张图片做病害识别/);
 });
 

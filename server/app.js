@@ -99,7 +99,7 @@ export function createApp({ store, responder, mode = 'demo', origin = 'http://12
     const heartbeat = setInterval(() => { if (!res.destroyed) res.write(': heartbeat\n\n'); }, 15000);
     let answer = '';
     try {
-      const result = await responder({ text, image, referenceImage, trustedHistory, history: history.slice(-30), sid: s.sid, requestId, quota: store.quota(s.sid), runDiagnosis: (selected, execute) => store.diagnoseOnce(s.sid, selected.id, execute), emit: data => {
+      const result = await responder({ text, image, referenceImage, trustedHistory, history: history.slice(-30), sid: s.sid, requestId, quota: store.quota(s.sid), emit: data => {
         if (data.type === 'delta') answer += data.text;
         emit(data);
       } });

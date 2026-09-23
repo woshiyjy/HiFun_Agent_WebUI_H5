@@ -1,2 +1,3 @@
 import { defineConfig } from 'vite';
-export default defineConfig({ build: { outDir: 'dist' }, server: { middlewareMode: true }, appType: 'spa' });
+import tailwindcss from '@tailwindcss/vite';
+export default defineConfig({ plugins: [tailwindcss()], build: { outDir: 'dist' }, server: { middlewareMode: true }, appType: 'spa' });
