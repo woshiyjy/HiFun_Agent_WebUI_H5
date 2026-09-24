@@ -1,20 +1,10 @@
 import React from 'react';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { MessagePrimitive, ThreadPrimitive, useAuiState } from '@assistant-ui/react';
-
-function SourceLink({ href, children }) {
-  try {
-    const url = new URL(href);
-    if (url.origin === 'https://docs.wehifun.cn' && !url.username && !url.password) return <a href={url.href} target="_blank" rel="noopener noreferrer">{children}</a>;
-  } catch {}
-  return <span>{children}</span>;
-}
+import { AssistantMarkdown } from './AssistantMarkdown.js';
 
 function TextPart() {
   const part = useAuiState(state => state.part);
-  const components = { a: SourceLink, img: () => null };
-  return part.type === 'text' ? <div className="message-text"><Markdown remarkPlugins={[remarkGfm]} components={components}>{part.text}</Markdown></div> : null;
+  return part.type === 'text' ? <AssistantMarkdown text={part.text} /> : null;
 }
 
 function ImagePart() {

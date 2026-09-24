@@ -71,7 +71,7 @@ test('用量包含缓存，不从费用换算；无用量不是零消耗',()=>{
 });
 
 test('有用量的失败请求照常结算；预留不足时不会再次发起模型调用',async t=>{
- const {store}=await fixture(t,40000),q=store.quota(randomUUID());let calls=0;
+ const {store}=await fixture(t,50000),q=store.quota(randomUUID());let calls=0;
  const respond=createResponder({mode:'live',env:{MODEL_MAX_TOKENS:'4096'},streamFn:(m,c)=>{calls++;return response(m,[{type:'text',text:'unfinished'}],'error',10000)}});
  await assert.rejects(respond({text:'你好',quota:q,emit:()=>{}}));
  assert.equal((await q.snapshot()).used,30000);

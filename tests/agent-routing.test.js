@@ -35,18 +35,23 @@ test('知识问题必须先检索，再允许正文阶段回答', async () => {
 test('正文回答只能附加本轮检索返回的来源', async () => {
   const events = [];
   const url = 'https://docs.wehifun.cn/采后处理/流程.html';
+  const secondUrl = 'https://docs.wehifun.cn/采后处理/预冷.html';
   const respond = createResponder({
     mode: 'live',
-    search: () => [{ id: '采后处理/流程', title: '采后处理流程', url, status: 'available', body: '分拣后进行预冷。', date: '2026-09-21' }],
+    search: () => [
+      { id: '采后处理/流程', title: '采后处理流程', url, status: 'available', body: '分拣后进行预冷。', date: '2026-09-21' },
+      { id: '采后处理/预冷', title: '首次预冷', url: secondUrl, status: 'available', body: '首次预冷目标约10℃。', date: '2026-09-21' },
+    ],
     streamFn: scripted([
       { tools: [{ name: 'search_knowledge', args: { query: '采后处理流程' } }] },
-      { tools: [{ name: 'complete_answer', args: { kind: 'knowledge', sourceIds: ['S1'] } }] },
+      { tools: [{ name: 'complete_answer', args: { kind: 'knowledge', sourceIds: ['S1', 'S2'] } }] },
     ], '资料记载了分拣和预冷环节。'),
   });
   const result = await respond({ text: '采后处理流程是什么？', emit: event => events.push(event) });
   const text = events.filter(event => event.type === 'delta').map(event => event.text).join('');
   assert.match(text, /分拣和预冷环节/);
-  assert.match(text, /\[采后处理流程\]\(https:\/\/docs\.wehifun\.cn/);
+  assert.match(text, /资料来源：\n\n- \[采后处理流程\]\(https:\/\/docs\.wehifun\.cn\/采后处理\/流程\.html\)\n- \[首次预冷\]\(https:\/\/docs\.wehifun\.cn\/采后处理\/预冷\.html\)/);
+  assert.equal((text.match(/资料来源：/g) || []).length, 1);
   assert.doesNotMatch(text, /fake\.html/);
   assert.equal(result.evidence.at(-1).accepted, true);
 });
@@ -71,15 +76,24 @@ test('暂未接入病害诊断时，返回清楚的能力边界说明', async ()
 });
 
 test('Agent 仅暴露只读知识工具和回答核验工具，不提供系统操作能力', async () => {
-  let exposedTools = [];
+  let exposedTools = [], initialPrompt = '', searchDescription = '', readDescription = '';
   const respond = createResponder({
     mode: 'live',
     streamFn: scripted([{ tools: [{ name: 'complete_answer', args: { kind: 'conversation', sourceIds: [] } }] }], '你好。', context => {
-      if (context.tools?.length) exposedTools = context.tools.map(tool => tool.name);
+      if (context.tools?.length) {
+        exposedTools = context.tools.map(tool => tool.name);
+        initialPrompt = context.systemPrompt;
+        searchDescription = context.tools[0].description;
+        readDescription = context.tools[1].description;
+      }
     }),
   });
   await respond({ text: '你好', emit: () => {} });
   assert.deepEqual(exposedTools, ['search_knowledge', 'read_knowledge', 'complete_answer']);
+  assert.match(initialPrompt, /回答结构与 Markdown/);
+  assert.match(initialPrompt, /每个已确认的独立环节各占一个有序列表项/);
+  assert.doesNotMatch(searchDescription, /每个已确认的独立环节/);
+  assert.match(readDescription, /完整步骤时.*必须先阅读相关流程正文/);
 });
 
 test('read_knowledge 只能打开本轮检索已经返回的文档', async () => {
