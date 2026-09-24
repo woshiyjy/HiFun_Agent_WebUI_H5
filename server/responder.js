@@ -194,25 +194,42 @@ export function createResponder({ mode = 'demo', diagnose, env = process.env, st
             messages: agent.state.messages,
             tools: [],
           };
-          let length = 0, completed = false;
+          let completed = false, answerLength = 0, answerContext = context;
           const filter = streamTextFilter(chunk => {
-            length += chunk.length;
-            if (length > 11000) { finalController.abort(); throw new AppError('ANSWER_LENGTH', '回答过长，未完整生成，请缩小问题范围。', 502); }
+            answerLength += chunk.length;
             emit({ type:'delta', text:chunk });
           });
-          for await (const event of callModel(model, context, { signal: finalController.signal })) {
-            if (timedOut) throw new AppError('MODEL_TIMEOUT', '这次回答耗时较长，未完整生成。', 504);
-            if (event.type === 'text_delta') filter.push(event.delta);
-            if (event.type === 'error') throw new AppError('MODEL_FAILED', '回答生成中断，内容尚未完整，请稍后重试。', 502);
-            if (event.type === 'done') {
-              if (event.reason !== 'stop' || event.message?.content?.some(c => c.type === 'toolCall')) throw new AppError('MODEL_FAILED', '回答尚未完整生成，请缩小问题范围后重试。', 502);
-              completed = true;
+          const maxAnswerSegments = 4;
+          for (let segmentIndex = 0; segmentIndex < maxAnswerSegments; segmentIndex++) {
+            let segmentText = '', finishReason = null;
+            for await (const event of callModel(model, answerContext, { signal: finalController.signal })) {
+              if (timedOut) throw new AppError('MODEL_TIMEOUT', '这次回答耗时较长，未完整生成。', 504);
+              if (event.type === 'text_delta') { segmentText += event.delta; filter.push(event.delta); }
+              if (event.type === 'error') throw new AppError('MODEL_FAILED', '回答生成中断，内容尚未完整，请稍后重试。', 502);
+              if (event.type === 'done') {
+                if (event.message?.content?.some(c => c.type === 'toolCall')) throw new AppError('MODEL_FAILED', '正文阶段意外请求了工具，回答未完成。', 502);
+                finishReason = event.reason;
+              }
             }
+            if (timedOut) throw new AppError('MODEL_TIMEOUT', '这次回答耗时较长，未完整生成。', 504);
+            if (finishReason === 'stop') { completed = true; break; }
+            if (finishReason !== 'length') throw new AppError('MODEL_FAILED', '回答尚未完整生成，请稍后重试。', 502);
+            if (segmentIndex === maxAnswerSegments - 1) throw new AppError('MODEL_FAILED', '回答超出本轮续写上限，已保留已生成内容。你可以让我从刚才的内容继续。', 502);
+            if (!segmentText) throw new AppError('MODEL_FAILED', '模型达到输出上限但没有生成正文，回答未完成。', 502);
+            emit({ type: 'status', text: '回答较长，正在继续生成后续内容' });
+            answerContext = {
+              ...answerContext,
+              messages: [
+                ...answerContext.messages,
+                { role: 'assistant', content: [{ type: 'text', text: segmentText }], timestamp: Date.now(), stopReason: 'length' },
+                { role: 'user', content: '请紧接刚才被输出长度打断的回答继续。只生成尚未写出的后续内容，不重复已写内容，不重新开头；继续遵守原问题、证据和回答格式。' },
+              ],
+            };
           }
           if (timedOut) throw new AppError('MODEL_TIMEOUT', '这次回答耗时较长，未完整生成。', 504);
           if (!completed) throw new AppError('MODEL_FAILED', '回答生成中断，内容尚未完整。', 502);
           filter.end();
-          if (!length) throw new AppError('MODEL_FAILED', '模型未生成正文，请稍后重试。', 502);
+          if (!answerLength) throw new AppError('MODEL_FAILED', '模型未生成正文，请稍后重试。', 502);
           for (const url of submitted.urls) emit({type:'delta', text:`\n\n来源：[${sources.get(url).title}](${url})`});
         }
       }

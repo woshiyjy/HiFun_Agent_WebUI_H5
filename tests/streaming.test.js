@@ -29,13 +29,29 @@ test('正文完成前已产生增量；思考和工具草稿不发布',async()=>
   await respond({text:'你好',emit:e=>output.push(e)});
   assert.equal(released,true);assert.equal(output.filter(e=>e.type==='delta').map(e=>e.text).join(''),'你好，嗨番。');
 });
-for (const reason of ['length','toolUse','error','aborted']) test(`正文${reason}不可报告成功`,async()=>{
+for (const reason of ['toolUse','error','aborted']) test(`正文${reason}不可报告成功`,async()=>{
   const respond=createResponder({mode:'live',streamFn:(m,c)=>{
     if(c.tools.length)return gate(m);
     const s=new AssistantMessageEventStream();const msg=message(m,[],reason);
     queueMicrotask(()=>{s.push({type:'text_delta',delta:'不完整'});s.push({type:'done',reason,message:msg});s.end(msg)});return s;
   }});
   await assert.rejects(respond({text:'你好',emit:()=>{}}),/未完整/);
+});
+test('正文达到单次长度上限后自动续写并保持连续流式输出',async()=>{
+  const output=[];let finalCalls=0;
+  const respond=createResponder({mode:'live',streamFn:(m,c)=>{
+    if(c.tools.length)return gate(m);
+    finalCalls++;
+    if(finalCalls===2) assert.match(JSON.stringify(c.messages.at(-1)),/刚才被输出长度打断/);
+    const text=finalCalls===1?'第一段。':'第二段。';
+    const reason=finalCalls===1?'length':'stop';
+    const s=new AssistantMessageEventStream();const msg=message(m,[{type:'text',text}],reason);
+    queueMicrotask(()=>{s.push({type:'text_delta',delta:text});s.push({type:'done',reason,message:msg});s.end(msg)});return s;
+  }});
+  await respond({text:'介绍一下知识库内容',emit:e=>output.push(e)});
+  assert.equal(finalCalls,2);
+  assert.equal(output.filter(e=>e.type==='delta').map(e=>e.text).join(''),'第一段。第二段。');
+  assert.ok(output.some(e=>e.type==='status'&&e.text.includes('继续生成')));
 });
 test('正文阶段共用超时，已输出片段不冒充完成',async()=>{
   const respond=createResponder({mode:'live',timeoutMs:25,streamFn:(m,c,o)=>{
@@ -61,14 +77,15 @@ test('DeepSeek V4.1 Flash 使用官方模型名、视觉/工具协议和显式�
   const env={MODEL_API_KEY:'test-key'};
   const {model,thinking}=modelSettings(env);let payload,url;
   assert.equal(model.id,'deepseek-flash');assert.equal(model.provider,'deepseek');assert.deepEqual(model.input,['text','image']);
-  assert.equal(thinking,true);assert.equal(model.maxTokens,4096);assert.equal(model.compat.thinkingFormat,'deepseek');
+  assert.equal(thinking,true);assert.equal(model.maxTokens,32768);assert.equal(model.compat.thinkingFormat,'deepseek');
+  assert.equal(model.contextWindow,1_048_576);
   const s=modelStream(env,thinking)(model,{messages:[{role:'user',content:[{type:'text',text:'hello'},{type:'image',mimeType:'image/png',data:'aGVsbG8='}],timestamp:0}],systemPrompt:'test',tools:[]},{fetch:async(request,init)=>{
     url=String(request);payload=JSON.parse(init.body);
     return new Response('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":null}]}\n\ndata: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}});
   }});
   for await(const e of s) assert.notEqual(e.type,'error');
   assert.equal(url,'https://api.deepseek.com/chat/completions');
-  assert.equal(payload.model,'deepseek-flash');assert.equal(payload.max_tokens,4096);
+  assert.equal(payload.model,'deepseek-flash');assert.equal(payload.max_tokens,32768);
   assert.deepEqual(payload.thinking,{type:'enabled'});assert.equal(payload.reasoning_effort,'high');
   assert.equal(payload.enable_thinking,undefined);
   assert.deepEqual(payload.messages[1].content[1],{type:'image_url',image_url:{url:'data:image/png;base64,aGVsbG8='}});

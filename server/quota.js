@@ -17,8 +17,7 @@ export function meteredStream(stream, quota, onError = () => {}) {
       async *[Symbol.asyncIterator]() {
         // Conservative preflight, refunded using provider usage. Text bytes and encoded
         // images deliberately overestimate normal tokenization; include protocol overhead.
-        const reserve = Math.max(model.contextWindow + model.maxTokens,
-          Buffer.byteLength(JSON.stringify(context), 'utf8') + 4096 + model.maxTokens);
+        const reserve = Buffer.byteLength(JSON.stringify(context), 'utf8') + 4096 + model.maxTokens;
         const id = randomUUID();
         try {
           await quota.reserve(id, reserve);

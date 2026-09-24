@@ -34,12 +34,13 @@ test('重启与Cookie恢复不清零；两小时过期新会话重置；旧sid�
  assert.equal((await restored.quota(s.sid).snapshot()).used,70);
 });
 test('中断缺失用量保留预留并跨重启；后续请求被阻止',async t=>{
- const f=await fixture(t,40000),sid=f.store.createSession().sid;
+ const f=await fixture(t,10000),sid=f.store.createSession().sid;
  const stream=meteredStream(()=>{throw new Error('disconnect')},f.store.quota(sid));
  await assert.rejects(async()=>{for await(const e of stream({contextWindow:32768,maxTokens:2048},{messages:[]})){}},/disconnect/);
  const q=(await f.restart()).quota(sid);
- assert.equal((await q.snapshot()).reserved,34816);
- await assert.rejects(q.reserve('next',34816),{code:'SESSION_QUOTA'});
+ const expected=Buffer.byteLength(JSON.stringify({messages:[]}),'utf8')+4096+2048;
+ assert.equal((await q.snapshot()).reserved,expected);
+ await assert.rejects(q.reserve('next',expected),{code:'SESSION_QUOTA'});
 });
 function response(model,content,reason,tokens){
  const stream=new AssistantMessageEventStream();
@@ -71,11 +72,12 @@ test('用量包含缓存，不从费用换算；无用量不是零消耗',()=>{
 
 test('有用量的失败请求照常结算；预留不足时不会再次发起模型调用',async t=>{
  const {store}=await fixture(t,40000),q=store.quota(randomUUID());let calls=0;
- const respond=createResponder({mode:'live',streamFn:(m,c)=>{calls++;return response(m,[{type:'text',text:'unfinished'}],'error',10000)}});
+ const respond=createResponder({mode:'live',env:{MODEL_MAX_TOKENS:'4096'},streamFn:(m,c)=>{calls++;return response(m,[{type:'text',text:'unfinished'}],'error',10000)}});
  await assert.rejects(respond({text:'你好',quota:q,emit:()=>{}}));
- assert.equal((await q.snapshot()).used,10000);
+ assert.equal((await q.snapshot()).used,30000);
+ assert.equal(calls,3);
  await assert.rejects(respond({text:'你好',quota:q,emit:()=>{}}),{code:'SESSION_QUOTA'});
- assert.equal(calls,1);
+ assert.equal(calls,3);
 });
 
 test('图片理解不产生独立胶囊用量', async t => {

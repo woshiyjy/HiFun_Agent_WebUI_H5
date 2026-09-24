@@ -37,7 +37,7 @@ npm run dev
 
 ## 主模型与回答显示
 
-当前代码接入 DeepSeek V4.1 Flash，使用模型 ID `deepseek-flash`、OpenAI 兼容接口 `https://api.deepseek.com`，服务端变量为 `MODEL_PROVIDER`、`MODEL_NAME`、`MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_ENABLE_THINKING`、`MODEL_REASONING_EFFORT` 和 `MODEL_MAX_TOKENS`。思考模式默认开启、推理强度为 high，应用保留32k上下文预算和单次4096输出 token 上限；这低于模型服务能力上限，用于控制单轮输出。旧百炼配置仍可通过显式设置 `MODEL_PROVIDER=bailian` 回退。公众 H5 当前不加载或调用独立诊断胶囊。
+当前代码接入 DeepSeek V4.1 Flash，使用模型 ID `deepseek-flash`、OpenAI 兼容接口 `https://api.deepseek.com`，服务端变量为 `MODEL_PROVIDER`、`MODEL_NAME`、`MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_ENABLE_THINKING`、`MODEL_REASONING_EFFORT` 和 `MODEL_MAX_TOKENS`。思考模式默认开启、推理强度为 high，模型上下文窗口按官方规格配置为 1M；单段输出预算为 32,768 tokens。若正文达到模型的单次长度上限，服务端最多自动续写到四段，整个过程仍以流式文字发布。旧百炼配置仍可通过显式设置 `MODEL_PROVIDER=bailian` 回退。公众 H5 当前不加载或调用独立诊断胶囊。
 
 DeepSeek API Key 仅通过受限的服务端运行配置提供，不能进入浏览器、Git 或镜像。真实模型调用与生产版本状态以每轮发布验收为准。
 

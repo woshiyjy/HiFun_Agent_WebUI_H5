@@ -11,14 +11,14 @@ export function modelSettings(env = {}, mode = 'live') {
   const isDeepSeek = provider === 'deepseek';
   const thinking = (isDeepSeek ? env.MODEL_ENABLE_THINKING : env.BAILIAN_ENABLE_THINKING) || (isDeepSeek ? 'true' : 'false');
   if (!['true', 'false'].includes(thinking)) throw new AppError('MODEL_CONFIG', '思考模式配置必须为 true 或 false。', 503);
-  const maxTokens = isDeepSeek ? Number(env.MODEL_MAX_TOKENS || 4096) : 2048;
+  const maxTokens = isDeepSeek ? Number(env.MODEL_MAX_TOKENS || 32768) : 2048;
   if (!Number.isSafeInteger(maxTokens) || maxTokens < 256 || maxTokens > 32768) modelConfigError('模型输出上限配置不正确。');
   const reasoningEffort = String(env.MODEL_REASONING_EFFORT || 'high').trim().toLowerCase();
   if (isDeepSeek && !['low', 'high', 'max'].includes(reasoningEffort)) modelConfigError('DeepSeek 推理强度配置不正确。');
   return {
     thinking: thinking === 'true',
     model: isDeepSeek
-      ? { id: mode === 'demo' ? 'local-demo' : env.MODEL_NAME || 'deepseek-flash', name: 'DeepSeek V4.1 Flash', api: 'openai-completions', provider, baseUrl: env.MODEL_BASE_URL || 'https://api.deepseek.com', apiKeyEnv: 'MODEL_API_KEY', reasoning: true, input: ['text', 'image'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 32768, maxTokens, reasoningEffort, compat: { supportsStore: false, supportsDeveloperRole: false, supportsReasoningEffort: false, maxTokensField: 'max_tokens', thinkingFormat: 'deepseek', requiresReasoningContentOnAssistantMessages: true } }
+      ? { id: mode === 'demo' ? 'local-demo' : env.MODEL_NAME || 'deepseek-flash', name: 'DeepSeek V4.1 Flash', api: 'openai-completions', provider, baseUrl: env.MODEL_BASE_URL || 'https://api.deepseek.com', apiKeyEnv: 'MODEL_API_KEY', reasoning: true, input: ['text', 'image'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1_048_576, maxTokens, reasoningEffort, compat: { supportsStore: false, supportsDeveloperRole: false, supportsReasoningEffort: false, maxTokensField: 'max_tokens', thinkingFormat: 'deepseek', requiresReasoningContentOnAssistantMessages: true } }
       : { id: mode === 'demo' ? 'local-demo' : env.BAILIAN_MODEL || 'qwen3.7-plus', name: '嗨番Agent', api: 'openai-completions', provider, baseUrl: env.BAILIAN_BASE_URL || 'http://127.0.0.1', apiKeyEnv: 'BAILIAN_API_KEY', reasoning: true, input: ['text', 'image'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 32768, maxTokens, compat: { supportsStore: false, supportsDeveloperRole: false, supportsReasoningEffort: false, maxTokensField: 'max_tokens', thinkingFormat: 'qwen' } },
   };
 }
